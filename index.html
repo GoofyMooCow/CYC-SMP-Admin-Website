@@ -1,0 +1,1801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SMP Admin Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+      :root {
+          --bg: #050712;
+          --bg-elevated: rgba(15, 18, 35, 0.9);
+          --accent: #4f46e5;
+          --accent-soft: rgba(79, 70, 229, 0.15);
+          --accent-strong: rgba(79, 70, 229, 0.35);
+          --text: #f9fafb;
+          --muted: #9ca3af;
+          --danger: #ef4444;
+          --success: #22c55e;
+          --border-subtle: rgba(148, 163, 184, 0.25);
+          --radius-lg: 16px;
+          --radius-md: 10px;
+          --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.7);
+          --shadow-subtle: 0 10px 30px rgba(15, 23, 42, 0.5);
+      }
+
+      * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          "Segoe UI", sans-serif;
+      }
+
+      body {
+          min-height: 100vh;
+          background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+          color: var(--text);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+      }
+
+      /* Login overlay */
+      #login-overlay {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          backdrop-filter: blur(18px);
+          background: radial-gradient(circle at top, rgba(79, 70, 229, 0.15), rgba(2, 6, 23, 0.95));
+          z-index: 20;
+      }
+
+      .login-card {
+          width: 100%;
+          max-width: 420px;
+          background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.9));
+          border-radius: 24px;
+          padding: 28px 26px 24px;
+          box-shadow: var(--shadow-soft);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          position: relative;
+          overflow: hidden;
+      }
+
+      .login-card::before {
+          content: "";
+          position: absolute;
+          inset: -40%;
+          background: radial-gradient(circle at top, rgba(79, 70, 229, 0.18), transparent 55%);
+          opacity: 0.9;
+          pointer-events: none;
+      }
+
+      .login-header {
+          position: relative;
+          margin-bottom: 22px;
+      }
+
+      .login-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          color: var(--muted);
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 10px;
+      }
+
+      .login-badge-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          background: var(--accent);
+          box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.4);
+      }
+
+      .login-title {
+          font-size: 22px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          margin-bottom: 4px;
+      }
+
+      .login-subtitle {
+          font-size: 13px;
+          color: var(--muted);
+      }
+
+      .login-form {
+          position: relative;
+          margin-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+      }
+
+      .field-label {
+          font-size: 12px;
+          color: var(--muted);
+          margin-bottom: 4px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+      }
+
+      .input-shell {
+          position: relative;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          display: flex;
+          align-items: center;
+          padding: 2px 10px;
+          gap: 6px;
+      }
+
+      .input-shell span {
+          font-size: 12px;
+          color: var(--muted);
+          padding: 4px 8px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+
+      .input-shell input {
+          flex: 1;
+          border: none;
+          outline: none;
+          background: transparent;
+          color: var(--text);
+          font-size: 14px;
+          padding: 8px 6px;
+      }
+
+      .login-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-top: 10px;
+          gap: 10px;
+      }
+
+      .login-meta {
+          font-size: 11px;
+          color: var(--muted);
+      }
+
+      .login-button {
+          border: none;
+          outline: none;
+          border-radius: 999px;
+          padding: 9px 18px;
+          background: linear-gradient(135deg, #4f46e5, #6366f1);
+          color: white;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          box-shadow: 0 12px 30px rgba(79, 70, 229, 0.55);
+          transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+      }
+
+      .login-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 16px 40px rgba(79, 70, 229, 0.7);
+          filter: brightness(1.05);
+      }
+
+      .login-button:active {
+          transform: translateY(0);
+          box-shadow: 0 8px 20px rgba(79, 70, 229, 0.5);
+      }
+
+      .login-error {
+          margin-top: 8px;
+          font-size: 12px;
+          color: var(--danger);
+          min-height: 16px;
+      }
+
+      /* Main layout */
+      #app {
+          display: none;
+          width: 100%;
+          max-width: 1200px;
+          height: 90vh;
+          max-height: 720px;
+          background: radial-gradient(circle at top left, rgba(79, 70, 229, 0.18), rgba(15, 23, 42, 0.98));
+          border-radius: 26px;
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          box-shadow: var(--shadow-soft);
+          display: grid;
+          grid-template-columns: 240px 1fr;
+          overflow: hidden;
+          position: relative;
+      }
+
+      .sidebar {
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96));
+          border-right: 1px solid rgba(148, 163, 184, 0.35);
+          padding: 18px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+      }
+
+      .brand {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+      }
+
+      .brand-logo {
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          font-weight: 700;
+          color: white;
+      }
+
+      .brand-text {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+      }
+
+      .brand-title {
+          font-size: 15px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+      }
+
+      .brand-subtitle {
+          font-size: 11px;
+          color: var(--muted);
+      }
+
+      .sidebar-section-label {
+          font-size: 11px;
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          margin-top: 4px;
+          margin-bottom: 4px;
+      }
+
+      .nav-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+      }
+
+      .nav-item {
+          border-radius: 999px;
+          padding: 8px 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: var(--muted);
+          cursor: pointer;
+          border: 1px solid transparent;
+          transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+      }
+
+      .nav-item span.icon {
+          width: 20px;
+          text-align: center;
+          font-size: 14px;
+      }
+
+      .nav-item.active {
+          background: var(--accent-soft);
+          color: var(--text);
+          border-color: var(--accent-strong);
+          transform: translateY(-1px);
+      }
+
+      .nav-item:hover:not(.active) {
+          background: rgba(15, 23, 42, 0.9);
+          color: #e5e7eb;
+          border-color: rgba(148, 163, 184, 0.4);
+      }
+
+      .sidebar-footer {
+          margin-top: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-size: 11px;
+          color: var(--muted);
+      }
+
+      .user-pill {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-radius: 999px;
+          padding: 6px 10px;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+
+      .user-pill span {
+          font-size: 12px;
+      }
+
+      .logout-btn {
+          border: none;
+          background: transparent;
+          color: var(--muted);
+          font-size: 11px;
+          cursor: pointer;
+          text-decoration: underline;
+      }
+
+      /* Main content */
+      .main {
+          padding: 18px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          position: relative;
+          min-height: 0;
+      }
+
+      .main-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+      }
+
+      .main-title {
+          font-size: 18px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+      }
+
+      .main-subtitle {
+          font-size: 12px;
+          color: var(--muted);
+      }
+
+      .server-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          font-size: 11px;
+          color: var(--muted);
+      }
+
+      .status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: var(--success);
+          box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
+      }
+
+      .content {
+          flex: 1;
+          display: grid;
+          grid-template-rows: auto 1fr;
+          gap: 10px;
+          min-height: 0;
+      }
+
+      .tab-strip {
+          display: flex;
+          gap: 6px;
+          background: rgba(15, 23, 42, 0.9);
+          border-radius: 999px;
+          padding: 4px;
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          max-width: 520px;
+      }
+
+      .tab {
+          flex: 1;
+          text-align: center;
+          padding: 6px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          color: var(--muted);
+          cursor: pointer;
+          transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+      }
+
+      .tab.active {
+          background: var(--accent-soft);
+          color: var(--text);
+          transform: translateY(-1px);
+      }
+
+      .tab-content {
+          border-radius: 18px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          box-shadow: var(--shadow-subtle);
+          padding: 14px 14px 12px;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          min-height: 0;
+      }
+
+      .tab-inner-scroll {
+          overflow: auto;
+          flex: 1;
+          min-height: 0;
+          padding-right: 4px;
+      }
+
+      .tab-panel {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-height: 0;
+      }
+
+      .section-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 6px;
+      }
+
+      .section-title {
+          font-size: 14px;
+          font-weight: 500;
+      }
+
+      .section-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+      }
+
+      .btn {
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          background: rgba(15, 23, 42, 0.9);
+          color: var(--muted);
+          font-size: 11px;
+          padding: 5px 10px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+      }
+
+      .btn.primary {
+          background: linear-gradient(135deg, #4f46e5, #6366f1);
+          color: white;
+          border-color: transparent;
+          box-shadow: 0 10px 25px rgba(79, 70, 229, 0.6);
+      }
+
+      .btn.danger {
+          border-color: rgba(248, 113, 113, 0.7);
+          color: #fecaca;
+      }
+
+      .btn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(148, 163, 184, 0.8);
+          color: #e5e7eb;
+      }
+
+      .btn.primary:hover {
+          filter: brightness(1.05);
+      }
+
+      .btn:active {
+          transform: translateY(0);
+          box-shadow: none;
+      }
+
+      .pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 3px 8px;
+          border-radius: 999px;
+          font-size: 11px;
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          color: var(--muted);
+      }
+
+      .pill.success {
+          border-color: rgba(34, 197, 94, 0.7);
+          color: #bbf7d0;
+      }
+
+      .pill.danger {
+          border-color: rgba(248, 113, 113, 0.7);
+          color: #fecaca;
+      }
+
+      /* News list */
+      .news-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+      }
+
+      .news-item {
+          border-radius: 14px;
+          padding: 10px 10px 8px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+      }
+
+      .news-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+      }
+
+      .news-title {
+          font-size: 13px;
+          font-weight: 500;
+      }
+
+      .news-meta {
+          font-size: 11px;
+          color: var(--muted);
+      }
+
+      .news-body {
+          font-size: 12px;
+          color: #e5e7eb;
+          margin-top: 2px;
+          white-space: pre-wrap;
+      }
+
+      .news-actions {
+          display: flex;
+          gap: 6px;
+          margin-top: 4px;
+      }
+
+      /* Players */
+      .players-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 8px;
+      }
+
+      .player-card {
+          border-radius: 14px;
+          padding: 8px 9px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          font-size: 12px;
+      }
+
+      .player-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+      }
+
+      .player-name {
+          font-weight: 500;
+      }
+
+      .player-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          margin-top: 4px;
+      }
+
+      /* Gallery */
+      .gallery-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 8px;
+      }
+
+      .gallery-card {
+          border-radius: 14px;
+          padding: 8px 9px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          font-size: 12px;
+      }
+
+      .gallery-url {
+          font-size: 11px;
+          color: var(--muted);
+          word-break: break-all;
+      }
+
+      /* Server tab */
+      .server-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+          gap: 10px;
+      }
+
+      .console-box,
+      .info-box {
+          border-radius: 14px;
+          padding: 8px 9px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-size: 12px;
+          min-height: 0;
+          height: 500px;
+      }
+
+      .console-output {
+          flex: 1;
+          background: #020617;
+          border-radius: 10px;
+          padding: 6px 8px;
+          font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 11px;
+          color: #e5e7eb;
+          overflow: auto;
+          white-space: pre-wrap;
+      }
+
+      .console-input-row {
+          display: flex;
+          gap: 6px;
+          margin-top: 4px;
+      }
+
+      .console-input-row input {
+          flex: 1;
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          background: rgba(15, 23, 42, 0.9);
+          color: var(--text);
+          font-size: 12px;
+          padding: 6px 10px;
+          outline: none;
+      }
+
+      .info-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 6px;
+      }
+
+      .info-pill {
+          border-radius: 12px;
+          padding: 6px 8px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          font-size: 11px;
+      }
+
+      .info-label {
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          font-size: 10px;
+      }
+
+      .info-value {
+          font-size: 12px;
+      }
+
+      /* Simple modal for add/edit */
+      .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.7);
+          display: none;
+          align-items: center;
+          justify-content: center;
+          z-index: 30;
+      }
+
+      .modal {
+          width: 100%;
+          max-width: 420px;
+          background: rgba(15, 23, 42, 0.98);
+          border-radius: 18px;
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          box-shadow: var(--shadow-soft);
+          padding: 16px 16px 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+      }
+
+      .modal-title {
+          font-size: 14px;
+          font-weight: 500;
+      }
+
+      .modal-field {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          font-size: 12px;
+      }
+
+      .modal-field label {
+          color: var(--muted);
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+      }
+
+      .modal-field input,
+      .modal-field textarea {
+          border-radius: 10px;
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          background: rgba(15, 23, 42, 0.9);
+          color: var(--text);
+          padding: 6px 8px;
+          font-size: 12px;
+          outline: none;
+          resize: vertical;
+          min-height: 32px;
+      }
+
+      .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 6px;
+          margin-top: 4px;
+      }
+
+      .toast {
+          position: fixed;
+          bottom: 18px;
+          right: 18px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(148, 163, 184, 0.5);
+          font-size: 12px;
+          color: var(--muted);
+          display: none;
+          z-index: 40;
+      }
+
+      @media (max-width: 900px) {
+          #app {
+              grid-template-columns: 1fr;
+              grid-template-rows: auto 1fr;
+              height: auto;
+              max-height: none;
+          }
+          .sidebar {
+              flex-direction: row;
+              align-items: center;
+              overflow-x: auto;
+          }
+          .sidebar-footer {
+              display: none;
+          }
+      }
+
+      @media (max-width: 640px) {
+          body {
+              padding: 12px;
+          }
+          .login-card {
+              padding: 22px 18px 18px;
+          }
+          .server-layout {
+              grid-template-columns: 1fr;
+          }
+      }
+  </style>
+</head>
+<body>
+<!-- Login overlay -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-badge">
+        <div class="login-badge-dot"></div>
+        <span>SMP Admin Access</span>
+      </div>
+      <div class="login-title">Sign in to control panel</div>
+      <div class="login-subtitle">Use your admin credentials.</div>
+    </div>
+    <form id="login-form" class="login-form">
+      <div>
+        <div class="field-label">Username</div>
+        <div class="input-shell">
+          <span>@</span>
+          <input type="text" id="login-username" autocomplete="username" required />
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Password</div>
+        <div class="input-shell">
+          <span>•••</span>
+          <input type="password" id="login-password" autocomplete="current-password" required />
+        </div>
+      </div>
+      <div class="login-footer">
+        <button type="submit" class="login-button">
+          <span>Enter panel</span>
+          <span>↵</span>
+        </button>
+      </div>
+      <div id="login-error" class="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo"><img style="width: 100%; height: auto" src="favicon.png" alt="Logo"></div>
+      <div class="brand-text">
+        <div class="brand-title">SMP Admin</div>
+        <div class="brand-subtitle">Control surface</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sidebar-section-label">Navigation</div>
+      <div class="nav-list">
+        <div class="nav-item active" data-tab="news">
+          <span>News & Announcements</span>
+        </div>
+        <div class="nav-item" data-tab="players">
+          <span>Player Management</span>
+        </div>
+        <div class="nav-item" data-tab="gallery">
+          <span>Gallery</span>
+        </div>
+        <div class="nav-item" data-tab="server">
+          <span>Server Console</span>
+        </div>
+        <!-- Permissions nav item (visible only to users with "permissions" permission) -->
+        <div class="nav-item" data-tab="permissions">
+          <span>Permissions</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <span id="sidebar-username">Not signed in</span>
+        <button class="logout-btn" id="logout-btn">Logout</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <div>
+        <div class="main-title" id="main-title">News & Announcements</div>
+        <div class="main-subtitle">Edit the news that appears on the public SMP website.</div>
+      </div>
+      <div class="server-pill" id="server-pill">
+        <div class="status-dot"></div>
+        <span id="server-pill-text">Checking server...</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="tab-strip">
+        <div class="tab active" id="news-tab" data-tab="news">News</div>
+        <div class="tab" id="players-tab" data-tab="players">Players</div>
+        <div class="tab" id="gallery-tab" data-tab="gallery">Gallery</div>
+        <div class="tab" id="server-tab" data-tab="server">Server</div>
+        <!-- Permissions tab button -->
+        <div class="tab" id="permissions-tab" data-tab="permissions">Permissions</div>
+      </div>
+
+      <div class="tab-content">
+        <!-- News tab -->
+        <div class="tab-panel" id="tab-news">
+          <div class="section-header">
+            <div class="section-title">News & Announcements</div>
+            <div class="section-actions">
+              <button class="btn primary" id="btn-add-news">+ New article</button>
+            </div>
+          </div>
+          <div class="tab-inner-scroll">
+            <div class="news-list" id="news-list"></div>
+          </div>
+        </div>
+
+        <!-- Players tab -->
+        <div class="tab-panel" id="tab-players" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">Player Management</div>
+            <div class="section-actions">
+              <button class="btn primary" id="btn-add-player">+ Add player</button>
+            </div>
+          </div>
+          <div class="tab-inner-scroll">
+            <div class="players-grid" id="players-grid"></div>
+          </div>
+        </div>
+
+        <!-- Gallery tab -->
+        <div class="tab-panel" id="tab-gallery" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">Gallery</div>
+            <div class="section-actions">
+              <button class="btn primary" id="btn-add-gallery">+ Add image</button>
+            </div>
+          </div>
+          <div class="tab-inner-scroll">
+            <div class="gallery-grid" id="gallery-grid"></div>
+          </div>
+        </div>
+
+        <!-- Server tab -->
+        <div class="tab-panel" id="tab-server" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">Server Console & Status</div>
+            <div class="section-actions">
+              <button class="btn" id="btn-refresh-server">Refresh status</button>
+            </div>
+          </div>
+          <div class="tab-inner-scroll">
+            <div class="server-layout">
+              <div class="console-box">
+                <div class="section-title">Console (stub)</div>
+                <div class="console-output" id="console-output"></div>
+                <div class="console-input-row">
+                  <input type="text" id="console-input" placeholder="say Hello from admin panel" />
+                  <button class="btn primary" id="console-send">Send</button>
+                </div>
+              </div>
+              <div class="info-box">
+                <div class="section-title">Server Info</div>
+                <div class="info-grid">
+                  <div class="info-pill">
+                    <div class="info-label">MOTD</div>
+                    <div class="info-value" id="info-motd">—</div>
+                  </div>
+                  <div class="info-pill">
+                    <div class="info-label">Online</div>
+                    <div class="info-value" id="info-online">—</div>
+                  </div>
+                  <div class="info-pill">
+                    <div class="info-label">Players</div>
+                    <div class="info-value" id="info-players">—</div>
+                  </div>
+                  <div class="info-pill">
+                    <div class="info-label">Slots</div>
+                    <div class="info-value" id="info-slots">—</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Permissions tab -->
+        <div class="tab-panel" id="tab-permissions" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">Admin Accounts</div>
+            <div class="section-actions">
+              <button class="btn primary" id="btn-add-admin">+ Add admin</button>
+            </div>
+          </div>
+          <div class="tab-inner-scroll">
+            <div id="accounts-list" class="news-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Modal</div>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn primary" id="modal-confirm">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+    // -----------------------------
+    // Config
+    // -----------------------------
+    const API_BASE = "http://localhost:5000"; // change to your server URL
+
+    let authToken = null;
+    let currentUser = null;
+
+    // -----------------------------
+    // Helpers
+    // -----------------------------
+    function showToast(msg) {
+        const toast = document.getElementById("toast");
+        toast.textContent = msg;
+        toast.style.display = "block";
+        setTimeout(() => {
+            toast.style.display = "none";
+        }, 2500);
+    }
+
+    async function api(path, options = {}) {
+        const headers = options.headers || {};
+        headers["Content-Type"] = "application/json";
+        if (authToken) {
+            headers["Authorization"] = "Bearer " + authToken;
+        }
+        const res = await fetch(API_BASE + path, {
+            ...options,
+            headers,
+        });
+        if (!res.ok) {
+            let msg = "Request failed";
+            try {
+                const data = await res.json();
+                if (data.error) msg = data.error;
+            } catch {}
+            throw new Error(msg);
+        }
+        if (res.status === 204) return null;
+        return res.json();
+    }
+
+    function setServerStatus(online, text) {
+        const pill = document.getElementById("server-pill");
+        const dot = pill.querySelector(".status-dot");
+        const label = document.getElementById("server-pill-text");
+        label.textContent = text;
+        if (online) {
+            dot.style.background = "var(--success)";
+            dot.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.35)";
+        } else {
+            dot.style.background = "var(--danger)";
+            dot.style.boxShadow = "0 0 0 4px rgba(248, 113, 113, 0.35)";
+        }
+    }
+
+    // -----------------------------
+    // Login
+    // -----------------------------
+    const loginForm = document.getElementById("login-form");
+    const loginOverlay = document.getElementById("login-overlay");
+    const loginError = document.getElementById("login-error");
+    const sidebarUsername = document.getElementById("sidebar-username");
+    const appRoot = document.getElementById("app");
+
+    loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        loginError.textContent = "";
+        const username = document.getElementById("login-username").value.trim();
+        const password = document.getElementById("login-password").value;
+        try {
+            const data = await api("/api/login", {
+                method: "POST",
+                body: JSON.stringify({ username, password }),
+            });
+            authToken = data.token;
+            currentUser = data.username;
+            permissions = data.permissions;
+
+            sidebarUsername.textContent = currentUser;
+            loginOverlay.style.display = "none";
+            appRoot.style.display = "grid";
+            showToast("Signed in as " + currentUser);
+
+            // Remove all tabs that are not in permissions
+            const tabs = document.querySelectorAll(".nav-item");
+            tabs.forEach((t) => {
+                const tabName = t.dataset.tab;
+                console.log(tabName);
+                if (!permissions.includes(tabName)) {
+                    t.style.display = "none";
+
+                    const panel = document.getElementById("tab-" + tabName);
+                    if (panel) panel.style.display = "none";
+
+                    const tabBtn = document.getElementById(tabName + "-tab");
+                    if (tabBtn) tabBtn.style.display = "none";
+                }
+            });
+
+            // Select the first available tab
+            const firstTab = document.querySelector(".nav-item:not([style*='display: none'])");
+            if (firstTab) {
+                firstTab.click();
+            }
+
+            await refreshAll();
+        } catch (err) {
+            loginError.textContent = err.message || "Login failed";
+        }
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+        try {
+            await api("/api/logout", { method: "POST" });
+        } catch {}
+        authToken = null;
+        currentUser = null;
+        sidebarUsername.textContent = "Not signed in";
+        appRoot.style.display = "none";
+        loginOverlay.style.display = "flex";
+        showToast("Logged out");
+    });
+
+    // -----------------------------
+    // Tabs & nav
+    // -----------------------------
+    const tabs = document.querySelectorAll(".tab");
+    const navItems = document.querySelectorAll(".nav-item");
+    const panels = {
+        news: document.getElementById("tab-news"),
+        players: document.getElementById("tab-players"),
+        gallery: document.getElementById("tab-gallery"),
+        server: document.getElementById("tab-server"),
+        // add permissions panel
+        permissions: document.getElementById("tab-permissions"),
+    };
+    const mainTitle = document.getElementById("main-title");
+    const mainSubtitle = document.querySelector(".main-subtitle");
+
+    const tabMeta = {
+        news: {
+            title: "News & Announcements",
+            subtitle: "Edit the news that appears on the public SMP website.",
+        },
+        players: {
+            title: "Player Management",
+            subtitle: "Whitelist, ban, and manage players on the SMP.",
+        },
+        gallery: {
+            title: "Gallery",
+            subtitle: "Manage images used on the public SMP site.",
+        },
+        server: {
+            title: "Server Console & Status",
+            subtitle: "Send commands and view basic server info.",
+        },
+        // permissions tab meta
+        permissions: {
+            title: "Admin Permissions",
+            subtitle: "Manage admin accounts and their permissions.",
+        },
+    };
+
+    function setActiveTab(tab) {
+        tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+        navItems.forEach((n) => n.classList.toggle("active", n.dataset.tab === tab));
+        Object.entries(panels).forEach(([key, el]) => {
+            el.style.display = key === tab ? "flex" : "none";
+        });
+        mainTitle.textContent = tabMeta[tab].title;
+        mainSubtitle.textContent = tabMeta[tab].subtitle;
+    }
+
+    tabs.forEach((t) =>
+        t.addEventListener("click", () => setActiveTab(t.dataset.tab))
+    );
+    navItems.forEach((n) =>
+        n.addEventListener("click", () => setActiveTab(n.dataset.tab))
+    );
+
+    // -----------------------------
+    // Modal
+    // -----------------------------
+    const modalBackdrop = document.getElementById("modal-backdrop");
+    const modalTitle = document.getElementById("modal-title");
+    const modalBody = document.getElementById("modal-body");
+    const modalCancel = document.getElementById("modal-cancel");
+    const modalConfirm = document.getElementById("modal-confirm");
+
+    let modalResolve = null;
+
+    function openModal({ title, bodyHTML, confirmText = "Save" }) {
+        modalTitle.textContent = title;
+        modalBody.innerHTML = bodyHTML;
+        modalConfirm.textContent = confirmText;
+        modalBackdrop.style.display = "flex";
+        return new Promise((resolve) => {
+            modalResolve = resolve;
+        });
+    }
+
+    function closeModal() {
+        modalBackdrop.style.display = "none";
+        modalResolve = null;
+    }
+
+    modalCancel.addEventListener("click", () => {
+        if (modalResolve) modalResolve(null);
+        closeModal();
+    });
+
+    // Replace modal confirm handler to support checkboxes groups and keep other behavior
+    modalConfirm.addEventListener("click", () => {
+        if (!modalResolve) return;
+        const inputs = Array.from(modalBody.querySelectorAll("input, textarea"));
+        const data = {};
+        // group inputs by name
+        const byName = {};
+        inputs.forEach((el) => {
+            const name = el.name || ("_" + Math.random().toString(36).slice(2)); // fallback unique
+            if (!byName[name]) byName[name] = [];
+            byName[name].push(el);
+        });
+        Object.entries(byName).forEach(([name, els]) => {
+            if (els[0].type === "checkbox") {
+                // collect checked values into array
+                const checked = els.filter(e => e.checked).map(e => e.value);
+                data[name] = checked;
+            } else if (els[0].type === "radio") {
+                const sel = els.find(e => e.checked);
+                data[name] = sel ? sel.value : null;
+            } else {
+                // use value of the first (text, textarea, file => we'll keep value but file handling is done via modalBody DOM)
+                data[name] = els[0].value;
+            }
+        });
+        modalResolve(data);
+        closeModal();
+    });
+
+    // -----------------------------
+    // News
+    // -----------------------------
+    const newsList = document.getElementById("news-list");
+    document.getElementById("btn-add-news").addEventListener("click", async () => {
+        const result = await openModal({
+            title: "New article",
+            bodyHTML: `
+          <div class="modal-field">
+            <label>Title</label>
+            <input name="title" />
+          </div>
+          <div class="modal-field">
+            <label>Body</label>
+            <textarea name="body" rows="5"></textarea>
+          </div>
+        `,
+        });
+        if (!result) return;
+        try {
+            await api("/api/news", {
+                method: "POST",
+                body: JSON.stringify(result),
+            });
+            showToast("Article created");
+            await loadNews();
+        } catch (err) {
+            showToast(err.message);
+        }
+    });
+
+    async function loadNews() {
+        try {
+            const items = await api("/api/news");
+            newsList.innerHTML = "";
+            if (!items.length) {
+                newsList.innerHTML = `<div class="news-meta">No news yet. Create your first article.</div>`;
+                return;
+            }
+            for (const item of items) {
+                const div = document.createElement("div");
+                div.className = "news-item";
+                div.innerHTML = `
+            <div class="news-header-row">
+              <div>
+                <div class="news-title">${item.title}</div>
+                <div class="news-meta">${new Date(item.date).toLocaleString()}</div>
+              </div>
+              <div class="pill">#${item.id}</div>
+            </div>
+            <div class="news-body">${item.body}</div>
+            <div class="news-actions">
+              <button class="btn" data-action="edit">Edit</button>
+              <button class="btn danger" data-action="delete">Delete</button>
+            </div>
+          `;
+                const editBtn = div.querySelector('[data-action="edit"]');
+                const deleteBtn = div.querySelector('[data-action="delete"]');
+                editBtn.addEventListener("click", async () => {
+                    const result = await openModal({
+                        title: "Edit article",
+                        bodyHTML: `
+                <div class="modal-field">
+                  <label>Title</label>
+                  <input name="title" value="${item.title.replace(/"/g, "&quot;")}" />
+                </div>
+                <div class="modal-field">
+                  <label>Body</label>
+                  <textarea name="body" rows="5">${item.body}</textarea>
+                </div>
+              `,
+                    });
+                    if (!result) return;
+                    try {
+                        await api("/api/news/" + item.id, {
+                            method: "PUT",
+                            body: JSON.stringify(result),
+                        });
+                        showToast("Article updated");
+                        await loadNews();
+                    } catch (err) {
+                        showToast(err.message);
+                    }
+                });
+                deleteBtn.addEventListener("click", async () => {
+                    if (!confirm("Delete this article?")) return;
+                    try {
+                        await api("/api/news/" + item.id, { method: "DELETE" });
+                        showToast("Article deleted");
+                        await loadNews();
+                    } catch (err) {
+                        showToast(err.message);
+                    }
+                });
+                newsList.appendChild(div);
+            }
+        } catch (err) {
+            newsList.innerHTML = `<div class="news-meta">Failed to load news: ${err.message}</div>`;
+        }
+    }
+
+    // -----------------------------
+    // Players
+    // -----------------------------
+    const playersGrid = document.getElementById("players-grid");
+    document.getElementById("btn-add-player").addEventListener("click", async () => {
+        const result = await openModal({
+            title: "Add player",
+            bodyHTML: `
+          <div class="modal-field">
+            <label>Player name</label>
+            <input name="name" />
+          </div>
+        `,
+        });
+        if (!result) return;
+        try {
+            await api("/api/players", {
+                method: "POST",
+                body: JSON.stringify(result),
+            });
+            showToast("Player added");
+            await loadPlayers();
+        } catch (err) {
+            showToast(err.message);
+        }
+    });
+
+    async function setPlayerStatus(name, status) {
+        try {
+            await api("/api/players/" + encodeURIComponent(name) + "/status", {
+                method: "PUT",
+                body: JSON.stringify({ status }),
+            });
+            showToast(`Set ${name} to ${status}`);
+            await loadPlayers();
+        } catch (err) {
+            showToast(err.message);
+        }
+    }
+
+    async function deletePlayer(name) {
+        if (!confirm("Remove player " + name + "?")) return;
+        try {
+            await api("/api/players/" + encodeURIComponent(name), {
+                method: "DELETE",
+            });
+            showToast("Player removed");
+            await loadPlayers();
+        } catch (err) {
+            showToast(err.message);
+        }
+    }
+
+    async function loadPlayers() {
+        try {
+            const players = await api("/api/players");
+            playersGrid.innerHTML = "";
+            if (!players.length) {
+                playersGrid.innerHTML = `<div class="news-meta">No players yet.</div>`;
+                return;
+            }
+            for (const p of players) {
+                const card = document.createElement("div");
+                card.className = "player-card";
+                const statusPillClass =
+                    p.status === "whitelisted"
+                        ? "pill success"
+                        : p.status === "banned"
+                            ? "pill danger"
+                            : "pill";
+                const statusLabel =
+                    p.status === "whitelisted"
+                        ? "Whitelisted"
+                        : p.status === "banned"
+                            ? "Banned"
+                            : "Neutral";
+                card.innerHTML = `
+                  <div style="display:flex; gap:10px; align-items:flex-start;">
+                    <img src="https://mc-heads.net/avatar/${p.name}" style="width:48px; height:48px; border-radius:4px;" alt="${p.name}'s avatar">
+                    <div style="flex:1; display:flex; flex-direction:column;">
+                      <div class="player-header">
+                        <div class="player-name">${p.name}</div>
+                        <div class="${statusPillClass}">${statusLabel}</div>
+                      </div>
+                      <div class="player-actions" style="margin-top:6px;">
+                        <button class="btn" data-action="whitelist">Whitelist</button>
+                        <button class="btn danger" data-action="ban">Ban</button>
+                        <button class="btn" data-action="neutral">Neutral</button>
+                        <button class="btn" data-action="remove">Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+                card.querySelector('[data-action="whitelist"]').addEventListener("click", () =>
+                    setPlayerStatus(p.name, "whitelisted")
+                );
+                card.querySelector('[data-action="ban"]').addEventListener("click", () =>
+                    setPlayerStatus(p.name, "banned")
+                );
+                card.querySelector('[data-action="neutral"]').addEventListener("click", () =>
+                    setPlayerStatus(p.name, "neutral")
+                );
+                card.querySelector('[data-action="remove"]').addEventListener("click", () =>
+                    deletePlayer(p.name)
+                );
+                playersGrid.appendChild(card);
+            }
+        } catch (err) {
+            playersGrid.innerHTML = `<div class="news-meta">Failed to load players: ${err.message}</div>`;
+        }
+    }
+
+    // -----------------------------
+    // Gallery
+    // -----------------------------
+    const galleryGrid = document.getElementById("gallery-grid");
+    document.getElementById("btn-add-gallery").addEventListener("click", async () => {
+        const result = await openModal({
+            title: "Add image",
+            bodyHTML: `
+          <div class="modal-field">
+            <label>By</label>
+            <input name="by" />
+          </div>
+          <div class="modal-field">
+            <label>Choose image</label>
+            <input type="file" name="image" accept="image/*" />
+          </div>
+        `,
+        });
+        if (!result) return;
+        try {
+            const fileInput = modalBody.querySelector('input[type="file"][name="image"]');
+            const file = fileInput && fileInput.files && fileInput.files[0];
+            if (!file) {
+                showToast("No image selected");
+                return;
+            }
+            const imageBase64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = reader.result;
+                    const commaIndex = dataUrl.indexOf(',');
+                    resolve(commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl);
+                };
+                reader.onerror = () => reject(new Error("Failed to read image"));
+                reader.readAsDataURL(file);
+            });
+            const payload = {
+                by: result.by || "",
+                image_base64: imageBase64,
+                filename: file.name,
+            };
+            await api("/api/gallery", {
+                method: "POST",
+                body: JSON.stringify(payload),
+            });
+            showToast("Image added");
+            await loadGallery();
+        } catch (err) {
+            showToast(err.message || "Failed to add image");
+        }
+    });
+
+    async function deleteGalleryItem(id) {
+        if (!confirm("Delete this image?")) return;
+        try {
+            await api("/api/gallery/" + id, { method: "DELETE" });
+            showToast("Image deleted");
+            await loadGallery();
+        } catch (err) {
+            showToast(err.message);
+        }
+    }
+
+    async function loadGallery() {
+        try {
+            const items = await api("/api/gallery");
+            galleryGrid.innerHTML = "";
+            if (!items.length) {
+                galleryGrid.innerHTML = `<div class="news-meta">No images yet.</div>`;
+                return;
+            }
+            for (const item of items) {
+                const card = document.createElement("div");
+                card.className = "gallery-card";
+                card.innerHTML = `
+            <div class="news-header-row">
+              <div>
+                <div class="news-title">${item.by}</div>
+                <div class="gallery-url">${item.date}</div>
+              </div>
+              <div class="pill">#${item.id}</div>
+            </div>
+            <div class="news-body" style="text-align: center;"><img src="${item.image}" alt="${item.image}" style="max-width: 90%; max-height: 250px;"></div>
+            <div class="news-actions">
+              <button class="btn danger" data-action="delete">Delete</button>
+            </div>
+          `;
+                card.querySelector('[data-action="delete"]').addEventListener("click", () =>
+                    deleteGalleryItem(item.id)
+                );
+                galleryGrid.appendChild(card);
+            }
+        } catch (err) {
+            galleryGrid.innerHTML = `<div class="news-meta">Failed to load gallery: ${err.message}</div>`;
+        }
+    }
+
+    // -----------------------------
+    // Permissions (Admin accounts)
+    // -----------------------------
+    const accountsList = document.getElementById("accounts-list");
+    document.getElementById("btn-add-admin").addEventListener("click", async () => {
+        const availablePermissions = ["news", "players", "gallery", "server", "permissions"];
+        const permsHtml = availablePermissions.map(p => `
+            <label style="display:inline-flex; gap:8px; align-items:center; margin-right:10px;">
+              <input type="checkbox" name="permissions" value="${p}" /> <span style="font-size:12px;">${p}</span>
+            </label>`).join("");
+        const result = await openModal({
+            title: "Create admin account",
+            bodyHTML: `
+              <div class="modal-field"><label>Username</label><input name="username" /></div>
+              <div class="modal-field"><label>Password</label><input name="password" type="password" /></div>
+              <div class="modal-field"><label>Confirm Password</label><input name="confirm_password" type="password" /></div>
+              <div class="modal-field"><label>Permissions</label><div>${permsHtml}</div></div>
+            `,
+            confirmText: "Create"
+        });
+        if (!result) return;
+        if (!result.username) { showToast("Username required"); return; }
+        if (!result.password) { showToast("Password required"); return; }
+        if (result.password !== result.confirm_password) { showToast("Passwords do not match"); return; }
+        try {
+            await api("/api/accounts", {
+                method: "POST",
+                body: JSON.stringify({
+                    username: result.username,
+                    password: result.password,
+                    permissions: result.permissions || []
+                })
+            });
+            showToast("Admin created");
+            await loadAccounts();
+        } catch (err) {
+            showToast(err.message);
+        }
+    });
+
+    async function loadAccounts() {
+        try {
+            const accounts = await api("/api/accounts");
+            accountsList.innerHTML = "";
+            if (!accounts.length) {
+                accountsList.innerHTML = `<div class="news-meta">No admin accounts found.</div>`;
+                return;
+            }
+            for (const acc of accounts) {
+                const card = document.createElement("div");
+                card.className = "news-item";
+                const permsText = Array.isArray(acc.permissions) ? acc.permissions.join(", ") : "";
+                card.innerHTML = `
+                  <div class="news-header-row">
+                    <div>
+                      <div class="news-title">${acc.username}</div>
+                      <div class="news-meta">Permissions: ${permsText || "—"}</div>
+                    </div>
+                    <div class="pill">#${acc.username}</div>
+                  </div>
+                  <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button class="btn" data-action="edit">Edit perms</button>
+                    <button class="btn" data-action="passwd">Change password</button>
+                    <button class="btn danger" data-action="delete">Delete</button>
+                  </div>
+                `;
+                // edit permissions
+                card.querySelector('[data-action="edit"]').addEventListener("click", async () => {
+                    const availablePermissions = ["news", "players", "gallery", "server", "permissions"];
+                    const permsHtml = availablePermissions.map(p => `
+                        <label style="display:inline-flex; gap:8px; align-items:center; margin-right:10px;">
+                          <input type="checkbox" name="permissions" value="${p}" ${Array.isArray(acc.permissions) && acc.permissions.includes(p) ? "checked":""} /> <span style="font-size:12px;">${p}</span>
+                        </label>`).join("");
+                    const result = await openModal({
+                        title: `Edit permissions: ${acc.username}`,
+                        bodyHTML: `
+                          <div class="modal-field"><label>Permissions</label><div>${permsHtml}</div></div>
+                        `,
+                        confirmText: "Save"
+                    });
+                    if (!result) return;
+                    try {
+                        await api("/api/accounts/" + encodeURIComponent(acc.username) + "/permissions", {
+                            method: "PUT",
+                            body: JSON.stringify({ permissions: result.permissions || [] })
+                        });
+                        showToast("Permissions updated");
+                        await loadAccounts();
+                    } catch (err) {
+                        showToast(err.message);
+                    }
+                });
+                // change password
+                card.querySelector('[data-action="passwd"]').addEventListener("click", async () => {
+                    const result = await openModal({
+                        title: `Change password: ${acc.username}`,
+                        bodyHTML: `
+                          <div class="modal-field"><label>New password</label><input name="password" type="password" /></div>
+                          <div class="modal-field"><label>Confirm</label><input name="confirm_password" type="password" /></div>
+                        `,
+                        confirmText: "Change"
+                    });
+                    if (!result) return;
+                    if (!result.password) { showToast("Password required"); return; }
+                    if (result.password !== result.confirm_password) { showToast("Passwords do not match"); return; }
+                    try {
+                        await api("/api/accounts/" + encodeURIComponent(acc.username) + "/password", {
+                            method: "PUT",
+                            body: JSON.stringify({ password: result.password })
+                        });
+                        showToast("Password changed");
+                    } catch (err) {
+                        showToast(err.message);
+                    }
+                });
+                // delete
+                card.querySelector('[data-action="delete"]').addEventListener("click", async () => {
+                    if (acc.username === currentUser) { showToast("Cannot delete the currently signed-in account"); return; }
+                    if (!confirm("Delete admin " + acc.username + "?")) return;
+                    try {
+                        await api("/api/accounts/" + encodeURIComponent(acc.username), { method: "DELETE" });
+                        showToast("Admin deleted");
+                        await loadAccounts();
+                    } catch (err) {
+                        showToast(err.message);
+                    }
+                });
+                accountsList.appendChild(card);
+            }
+        } catch (err) {
+            accountsList.innerHTML = `<div class="news-meta">Failed to load admins: ${err.message}</div>`;
+        }
+    }
+
+    // -----------------------------
+    // Server tab
+    // -----------------------------
+    const infoMotd = document.getElementById("info-motd");
+    const infoOnline = document.getElementById("info-online");
+    const infoPlayers = document.getElementById("info-players");
+    const infoSlots = document.getElementById("info-slots");
+    const consoleOutput = document.getElementById("console-output");
+    const consoleInput = document.getElementById("console-input");
+    const consoleSend = document.getElementById("console-send");
+
+    async function loadServerInfo() {
+        try {
+            const info = await api("/api/server-info");
+            infoMotd.textContent = info.motd;
+            infoOnline.textContent = info.online ? "Online" : "Offline";
+            infoPlayers.textContent = info.players_online;
+            infoSlots.textContent = info.max_players;
+            setServerStatus(info.online, info.online ? "Server online" : "Server offline");
+        } catch (err) {
+            infoMotd.textContent = "—";
+            infoOnline.textContent = "Unknown";
+            infoPlayers.textContent = "—";
+            infoSlots.textContent = "—";
+            setServerStatus(false, "Server unreachable");
+        }
+    }
+
+    document.getElementById("btn-refresh-server").addEventListener("click", loadServerInfo);
+
+    consoleSend.addEventListener("click", async () => {
+        const cmd = consoleInput.value.trim();
+        if (!cmd) return;
+        try {
+            const res = await api("/api/console/command", {
+                method: "POST",
+                body: JSON.stringify({ command: cmd }),
+            });
+            consoleOutput.textContent += "> " + cmd + "\n" + res.response + "\n";
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            consoleInput.value = "";
+        } catch (err) {
+            showToast(err.message);
+        }
+    });
+
+    consoleInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            consoleSend.click();
+        }
+    });
+
+    // -----------------------------
+    // Initial
+    // -----------------------------
+    async function refreshAll() {
+        await Promise.all([loadNews(), loadPlayers(), loadGallery(), loadServerInfo(), (async ()=>{ try{ await loadAccounts(); }catch{} })()]);
+    }
+
+    // You could add localStorage token persistence here if you want
+</script>
+</body>
+</html>
