@@ -1055,6 +1055,8 @@
     // -----------------------------
     const API_BASE = "https://june-vagueness-try.ngrok-free.dev"; // change to your server URL
 
+    console.log("API:", API_BASE + "/api/players");
+
     let authToken = null;
     let currentUser = null;
 
@@ -1073,23 +1075,37 @@
     async function api(path, options = {}) {
         const headers = options.headers || {};
         headers["Content-Type"] = "application/json";
+        headers['ngrok-skip-browser-warning'] = 'true';
+
         if (authToken) {
             headers["Authorization"] = "Bearer " + authToken;
         }
-        const res = await fetch(API_BASE + path, {
+
+        const url = API_BASE + path;
+
+        console.log("➡️ REQUEST");
+        console.log("URL:", url);
+        console.log("METHOD:", options.method || "GET");
+        console.log("HEADERS:", headers);
+        console.log("BODY:", options.body || null);
+
+        const res = await fetch(url, {
             ...options,
             headers,
         });
+
+        console.log("⬅️ RESPONSE");
+        console.log("STATUS:", res.status);
+        console.log("RESPONSE HEADERS:", [...res.headers.entries()]);
+
+        const text = await res.clone().text();
+        console.log("RAW BODY:", text);
+
         if (!res.ok) {
-            let msg = "Request failed";
-            try {
-                const data = await res.json();
-                if (data.error) msg = data.error;
-            } catch {}
-            throw new Error(msg);
+            throw new Error("Request failed: " + res.status);
         }
-        if (res.status === 204) return null;
-        return res.json();
+
+        return JSON.parse(text);
     }
 
     function setServerStatus(online, text) {
