@@ -774,6 +774,91 @@
           margin-top: 4px;
       }
 
+      /* Loading state */
+      .loading-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 14px 4px;
+          color: var(--muted);
+          font-size: 12px;
+          font-family: var(--mono);
+      }
+
+      .spinner {
+          width: 13px;
+          height: 13px;
+          border-radius: 50%;
+          border: 2px solid var(--border);
+          border-top-color: var(--accent);
+          animation: spin 0.7s linear infinite;
+      }
+
+      @keyframes spin {
+          to { transform: rotate(360deg); }
+      }
+
+      /* Search + pagination */
+      .list-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+      }
+
+      .search-input {
+          flex: 1;
+          max-width: 240px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border);
+          background: var(--panel-alt);
+          color: var(--text);
+          font-size: 12px;
+          padding: 6px 10px;
+          outline: none;
+      }
+
+      .search-input:focus {
+          border-color: var(--accent-dim);
+      }
+
+      .pagination {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding-top: 8px;
+          font-size: 11.5px;
+          color: var(--muted);
+          font-family: var(--mono);
+      }
+
+      .pagination button {
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border);
+          background: var(--panel-alt);
+          color: var(--muted);
+          font-size: 11px;
+          padding: 4px 9px;
+          cursor: pointer;
+      }
+
+      .pagination button:hover:not(:disabled) {
+          color: var(--text);
+          border-color: #4a4c58;
+      }
+
+      .pagination button:disabled {
+          opacity: 0.4;
+          cursor: default;
+      }
+
+      /* Confirm modal variant */
+      .modal.confirm-modal {
+          max-width: 360px;
+          border-top-color: var(--danger);
+      }
+
       .toast {
           position: fixed;
           bottom: 18px;
@@ -930,7 +1015,11 @@
             </div>
           </div>
           <div class="tab-inner-scroll">
+            <div class="list-toolbar">
+              <input type="text" class="search-input" id="news-search" placeholder="Search articles…" />
+            </div>
             <div class="news-list" id="news-list"></div>
+            <div class="pagination" id="news-pagination"></div>
           </div>
         </div>
 
@@ -943,7 +1032,11 @@
             </div>
           </div>
           <div class="tab-inner-scroll">
+            <div class="list-toolbar">
+              <input type="text" class="search-input" id="players-search" placeholder="Search players…" />
+            </div>
             <div class="players-grid" id="players-grid"></div>
+            <div class="pagination" id="players-pagination"></div>
           </div>
         </div>
 
@@ -1087,11 +1180,52 @@
         const text = await res.clone().text();
         console.log("RAW BODY:", text);
 
+        if (res.status === 401) {
+            forceReLogin("Your session has expired. Please sign in again.");
+            throw new Error("Session expired");
+        }
+
         if (!res.ok) {
             throw new Error("Request failed: " + res.status);
         }
 
         return JSON.parse(text);
+    }
+
+    function forceReLogin(message) {
+        authToken = null;
+        currentUser = null;
+        sidebarUsername.textContent = "Not signed in";
+        appRoot.style.display = "none";
+        loginOverlay.style.display = "flex";
+        loginError.textContent = message || "";
+        // reset any permission-based hiding so a fresh login re-evaluates it
+        document.querySelectorAll(".nav-item, .tab").forEach((el) => {
+            el.style.display = "";
+        });
+    }
+
+    // -----------------------------
+    // Small shared UI helpers
+    // -----------------------------
+    function showLoading(container, label = "Loading…") {
+        container.innerHTML = `<div class="loading-row"><div class="spinner"></div><span>${label}</span></div>`;
+    }
+
+    function confirmDialog({ title = "Are you sure?", message = "", confirmText = "Delete", danger = true }) {
+        modalTitle.textContent = title;
+        modalBody.innerHTML = `<div style="font-size:12.5px; color: var(--muted); line-height:1.5;">${message}</div>`;
+        modalConfirm.textContent = confirmText;
+        modalConfirm.className = danger ? "btn danger" : "btn primary";
+        document.querySelector(".modal").classList.add("confirm-modal");
+        modalBackdrop.style.display = "flex";
+        return new Promise((resolve) => {
+            modalResolve = (val) => {
+                modalConfirm.className = "btn primary";
+                document.querySelector(".modal").classList.remove("confirm-modal");
+                resolve(!!val);
+            };
+        });
     }
 
     function setServerStatus(online, text) {
@@ -1295,6 +1429,12 @@
     // News
     // -----------------------------
     const newsList = document.getElementById("news-list");
+    const newsSearchInput = document.getElementById("news-search");
+    const newsPaginationEl = document.getElementById("news-pagination");
+    const NEWS_PAGE_SIZE = 6;
+    let allNews = [];
+    let newsPage = 1;
+
     document.getElementById("btn-add-news").addEventListener("click", async () => {
         const result = await openModal({
             title: "New article",
@@ -1311,29 +1451,62 @@
         });
         if (!result) return;
         try {
-            await api("/api/news", {
+            const created = await api("/api/news", {
                 method: "POST",
                 body: JSON.stringify(result),
             });
             showToast("Article created");
-            await loadNews();
+            // Optimistically add without a full refetch, falling back to reload
+            // if the server didn't hand back the created record.
+            if (created && created.id !== undefined) {
+                allNews.unshift(created);
+                newsPage = 1;
+                renderNewsPage();
+            } else {
+                await loadNews();
+            }
         } catch (err) {
             showToast(err.message);
         }
     });
 
-    async function loadNews() {
-        try {
-            const items = await api("/api/news");
-            newsList.innerHTML = "";
-            if (!items.length) {
-                newsList.innerHTML = `<div class="news-meta">No news yet. Create your first article.</div>`;
-                return;
-            }
-            for (const item of items) {
-                const div = document.createElement("div");
-                div.className = "news-item";
-                div.innerHTML = `
+    newsSearchInput.addEventListener("input", () => {
+        newsPage = 1;
+        renderNewsPage();
+    });
+
+    function getFilteredNews() {
+        const q = newsSearchInput.value.trim().toLowerCase();
+        if (!q) return allNews;
+        return allNews.filter(
+            (n) => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q)
+        );
+    }
+
+    function renderNewsPage() {
+        const filtered = getFilteredNews();
+        newsList.innerHTML = "";
+
+        if (!allNews.length) {
+            newsList.innerHTML = `<div class="news-meta">No news yet. Create your first article.</div>`;
+            newsPaginationEl.innerHTML = "";
+            return;
+        }
+        if (!filtered.length) {
+            newsList.innerHTML = `<div class="news-meta">No articles match your search.</div>`;
+            newsPaginationEl.innerHTML = "";
+            return;
+        }
+
+        const totalPages = Math.max(1, Math.ceil(filtered.length / NEWS_PAGE_SIZE));
+        if (newsPage > totalPages) newsPage = totalPages;
+        const start = (newsPage - 1) * NEWS_PAGE_SIZE;
+        const pageItems = filtered.slice(start, start + NEWS_PAGE_SIZE);
+
+        for (const item of pageItems) {
+            const div = document.createElement("div");
+            div.className = "news-item";
+            div.innerHTML = `
             <div class="news-header-row">
               <div>
                 <div class="news-title">${item.title}</div>
@@ -1347,12 +1520,12 @@
               <button class="btn danger" data-action="delete">Delete</button>
             </div>
           `;
-                const editBtn = div.querySelector('[data-action="edit"]');
-                const deleteBtn = div.querySelector('[data-action="delete"]');
-                editBtn.addEventListener("click", async () => {
-                    const result = await openModal({
-                        title: "Edit article",
-                        bodyHTML: `
+            const editBtn = div.querySelector('[data-action="edit"]');
+            const deleteBtn = div.querySelector('[data-action="delete"]');
+            editBtn.addEventListener("click", async () => {
+                const result = await openModal({
+                    title: "Edit article",
+                    bodyHTML: `
                 <div class="modal-field">
                   <label>Title</label>
                   <input name="title" value="${item.title.replace(/"/g, "&quot;")}" />
@@ -1362,31 +1535,57 @@
                   <textarea name="body" rows="5">${item.body}</textarea>
                 </div>
               `,
+                });
+                if (!result) return;
+                try {
+                    await api("/api/news/" + item.id, {
+                        method: "PUT",
+                        body: JSON.stringify(result),
                     });
-                    if (!result) return;
-                    try {
-                        await api("/api/news/" + item.id, {
-                            method: "PUT",
-                            body: JSON.stringify(result),
-                        });
-                        showToast("Article updated");
-                        await loadNews();
-                    } catch (err) {
-                        showToast(err.message);
-                    }
+                    showToast("Article updated");
+                    item.title = result.title;
+                    item.body = result.body;
+                    renderNewsPage();
+                } catch (err) {
+                    showToast(err.message);
+                }
+            });
+            deleteBtn.addEventListener("click", async () => {
+                const ok = await confirmDialog({
+                    title: "Delete article?",
+                    message: `This will permanently remove "${item.title}" from the public site.`,
+                    confirmText: "Delete article",
                 });
-                deleteBtn.addEventListener("click", async () => {
-                    if (!confirm("Delete this article?")) return;
-                    try {
-                        await api("/api/news/" + item.id, { method: "DELETE" });
-                        showToast("Article deleted");
-                        await loadNews();
-                    } catch (err) {
-                        showToast(err.message);
-                    }
-                });
-                newsList.appendChild(div);
-            }
+                if (!ok) return;
+                try {
+                    await api("/api/news/" + item.id, { method: "DELETE" });
+                    showToast("Article deleted");
+                    allNews = allNews.filter((n) => n.id !== item.id);
+                    renderNewsPage();
+                } catch (err) {
+                    showToast(err.message);
+                }
+            });
+            newsList.appendChild(div);
+        }
+
+        newsPaginationEl.innerHTML = `
+          <button ${newsPage <= 1 ? "disabled" : ""} id="news-prev">‹ Prev</button>
+          <span>Page ${newsPage} / ${totalPages}</span>
+          <button ${newsPage >= totalPages ? "disabled" : ""} id="news-next">Next ›</button>
+        `;
+        const prevBtn = document.getElementById("news-prev");
+        const nextBtn = document.getElementById("news-next");
+        if (prevBtn) prevBtn.addEventListener("click", () => { newsPage--; renderNewsPage(); });
+        if (nextBtn) nextBtn.addEventListener("click", () => { newsPage++; renderNewsPage(); });
+    }
+
+    async function loadNews() {
+        showLoading(newsList, "Loading news…");
+        newsPaginationEl.innerHTML = "";
+        try {
+            allNews = await api("/api/news");
+            renderNewsPage();
         } catch (err) {
             newsList.innerHTML = `<div class="news-meta">Failed to load news: ${err.message}</div>`;
         }
@@ -1396,6 +1595,12 @@
     // Players
     // -----------------------------
     const playersGrid = document.getElementById("players-grid");
+    const playersSearchInput = document.getElementById("players-search");
+    const playersPaginationEl = document.getElementById("players-pagination");
+    const PLAYERS_PAGE_SIZE = 12;
+    let allPlayers = [];
+    let playersPage = 1;
+
     document.getElementById("btn-add-player").addEventListener("click", async () => {
         const result = await openModal({
             title: "Add player",
@@ -1408,71 +1613,118 @@
         });
         if (!result) return;
         try {
-            await api("/api/players", {
+            const created = await api("/api/players", {
                 method: "POST",
                 body: JSON.stringify(result),
             });
             showToast("Player added");
-            await loadPlayers();
+            if (created && created.name) {
+                allPlayers.push(created);
+                renderPlayersPage();
+            } else {
+                await loadPlayers();
+            }
         } catch (err) {
             showToast(err.message);
         }
     });
 
     async function setPlayerStatus(name, status) {
+        const player = allPlayers.find((p) => p.name === name);
+        const previousStatus = player ? player.status : undefined;
+        // Optimistic update: reflect the change immediately, roll back on failure.
+        if (player) {
+            player.status = status;
+            renderPlayersPage();
+        }
         try {
             await api("/api/players/" + encodeURIComponent(name) + "/status", {
                 method: "PUT",
                 body: JSON.stringify({ status }),
             });
             showToast(`Set ${name} to ${status}`);
-            await loadPlayers();
         } catch (err) {
+            if (player) {
+                player.status = previousStatus;
+                renderPlayersPage();
+            }
             showToast(err.message);
         }
     }
 
     async function deletePlayer(name) {
-        if (!confirm("Remove player " + name + "?")) return;
+        const ok = await confirmDialog({
+            title: "Remove player?",
+            message: `This will remove <strong>${name}</strong> from player management.`,
+            confirmText: "Remove player",
+        });
+        if (!ok) return;
         try {
             await api("/api/players/" + encodeURIComponent(name), {
                 method: "DELETE",
             });
             showToast("Player removed");
-            await loadPlayers();
+            allPlayers = allPlayers.filter((p) => p.name !== name);
+            renderPlayersPage();
         } catch (err) {
             showToast(err.message);
         }
     }
 
-    async function loadPlayers() {
-        try {
-            const players = await api("/api/players");
-            playersGrid.innerHTML = "";
-            if (!players.length) {
-                playersGrid.innerHTML = `<div class="news-meta">No players yet.</div>`;
-                return;
-            }
-            for (const p of players) {
-                const card = document.createElement("div");
-                card.className = "player-card";
-                const statusPillClass =
-                    p.status === "whitelisted"
-                        ? "pill success"
-                        : p.status === "banned"
-                            ? "pill danger"
-                            : "pill";
-                const statusLabel =
-                    p.status === "whitelisted"
-                        ? "Whitelisted"
-                        : p.status === "banned"
-                            ? "Banned"
-                            : "Neutral";
+    playersSearchInput.addEventListener("input", () => {
+        playersPage = 1;
+        renderPlayersPage();
+    });
 
-                if (p.bedrock) {
-                    card.innerHTML = `
+    function getFilteredPlayers() {
+        const q = playersSearchInput.value.trim().toLowerCase();
+        if (!q) return allPlayers;
+        return allPlayers.filter((p) => p.name.toLowerCase().includes(q));
+    }
+
+    function renderPlayersPage() {
+        const filtered = getFilteredPlayers();
+        playersGrid.innerHTML = "";
+
+        if (!allPlayers.length) {
+            playersGrid.innerHTML = `<div class="news-meta">No players yet.</div>`;
+            playersPaginationEl.innerHTML = "";
+            return;
+        }
+        if (!filtered.length) {
+            playersGrid.innerHTML = `<div class="news-meta">No players match your search.</div>`;
+            playersPaginationEl.innerHTML = "";
+            return;
+        }
+
+        const totalPages = Math.max(1, Math.ceil(filtered.length / PLAYERS_PAGE_SIZE));
+        if (playersPage > totalPages) playersPage = totalPages;
+        const start = (playersPage - 1) * PLAYERS_PAGE_SIZE;
+        const pageItems = filtered.slice(start, start + PLAYERS_PAGE_SIZE);
+
+        for (const p of pageItems) {
+            const card = document.createElement("div");
+            card.className = "player-card";
+            const statusPillClass =
+                p.status === "whitelisted"
+                    ? "pill success"
+                    : p.status === "banned"
+                        ? "pill danger"
+                        : "pill";
+            const statusLabel =
+                p.status === "whitelisted"
+                    ? "Whitelisted"
+                    : p.status === "banned"
+                        ? "Banned"
+                        : "Neutral";
+
+            const avatarUrl = p.bedrock
+                ? `https://mc-api.io/render/face/${p.name.slice(1).replace(/_/g, "%20")}/bedrock`
+                : `https://mc-heads.net/avatar/${p.name}`;
+
+            card.innerHTML = `
                     <div style="display:flex; gap:10px; align-items:flex-start;">
-                      <img src="https://mc-api.io/render/face/${p.name.slice(1).replace(/_/g, "%20")}/bedrock" style="width:48px; height:48px; border-radius:4px;" alt="${p.name}'s avatar">
+                      <img src="${avatarUrl}" style="width:48px; height:48px; border-radius:4px;" alt="${p.name}'s avatar">
                       <div style="flex:1; display:flex; flex-direction:column;">
                         <div class="player-header">
                           <div class="player-name">${p.name}</div>
@@ -1487,39 +1739,38 @@
                       </div>
                     </div>
                   `;
-                } else {
-                    card.innerHTML = `
-                    <div style="display:flex; gap:10px; align-items:flex-start;">
-                      <img src="https://mc-heads.net/avatar/${p.name}" style="width:48px; height:48px; border-radius:4px;" alt="${p.name}'s avatar">
-                      <div style="flex:1; display:flex; flex-direction:column;">
-                        <div class="player-header">
-                          <div class="player-name">${p.name}</div>
-                          <div class="${statusPillClass}">${statusLabel}</div>
-                        </div>
-                        <div class="player-actions" style="margin-top:6px;">
-                          <button class="btn" data-action="whitelist">Whitelist</button>
-                          <button class="btn danger" data-action="ban">Ban</button>
-                          <button class="btn" data-action="neutral">Neutral</button>
-                          <button class="btn" data-action="remove">Remove</button>
-                        </div>
-                      </div>
-                    </div>
-                  `;
-                }
-                card.querySelector('[data-action="whitelist"]').addEventListener("click", () =>
-                    setPlayerStatus(p.name, "whitelisted")
-                );
-                card.querySelector('[data-action="ban"]').addEventListener("click", () =>
-                    setPlayerStatus(p.name, "banned")
-                );
-                card.querySelector('[data-action="neutral"]').addEventListener("click", () =>
-                    setPlayerStatus(p.name, "neutral")
-                );
-                card.querySelector('[data-action="remove"]').addEventListener("click", () =>
-                    deletePlayer(p.name)
-                );
-                playersGrid.appendChild(card);
-            }
+            card.querySelector('[data-action="whitelist"]').addEventListener("click", () =>
+                setPlayerStatus(p.name, "whitelisted")
+            );
+            card.querySelector('[data-action="ban"]').addEventListener("click", () =>
+                setPlayerStatus(p.name, "banned")
+            );
+            card.querySelector('[data-action="neutral"]').addEventListener("click", () =>
+                setPlayerStatus(p.name, "neutral")
+            );
+            card.querySelector('[data-action="remove"]').addEventListener("click", () =>
+                deletePlayer(p.name)
+            );
+            playersGrid.appendChild(card);
+        }
+
+        playersPaginationEl.innerHTML = `
+          <button ${playersPage <= 1 ? "disabled" : ""} id="players-prev">‹ Prev</button>
+          <span>Page ${playersPage} / ${totalPages}</span>
+          <button ${playersPage >= totalPages ? "disabled" : ""} id="players-next">Next ›</button>
+        `;
+        const prevBtn = document.getElementById("players-prev");
+        const nextBtn = document.getElementById("players-next");
+        if (prevBtn) prevBtn.addEventListener("click", () => { playersPage--; renderPlayersPage(); });
+        if (nextBtn) nextBtn.addEventListener("click", () => { playersPage++; renderPlayersPage(); });
+    }
+
+    async function loadPlayers() {
+        showLoading(playersGrid, "Loading players…");
+        playersPaginationEl.innerHTML = "";
+        try {
+            allPlayers = await api("/api/players");
+            renderPlayersPage();
         } catch (err) {
             playersGrid.innerHTML = `<div class="news-meta">Failed to load players: ${err.message}</div>`;
         }
@@ -1577,18 +1828,28 @@
         }
     });
 
-    async function deleteGalleryItem(id) {
-        if (!confirm("Delete this image?")) return;
+    async function deleteGalleryItem(id, cardEl) {
+        const ok = await confirmDialog({
+            title: "Delete image?",
+            message: "This will remove the image from the public gallery.",
+            confirmText: "Delete image",
+        });
+        if (!ok) return;
         try {
             await api("/api/gallery/" + id, { method: "DELETE" });
             showToast("Image deleted");
-            await loadGallery();
+            // Optimistic removal: drop the card directly instead of refetching everything.
+            if (cardEl) cardEl.remove();
+            if (!galleryGrid.children.length) {
+                galleryGrid.innerHTML = `<div class="news-meta">No images yet.</div>`;
+            }
         } catch (err) {
             showToast(err.message);
         }
     }
 
     async function loadGallery() {
+        showLoading(galleryGrid, "Loading gallery…");
         try {
             const items = await api("/api/gallery");
             galleryGrid.innerHTML = "";
@@ -1613,7 +1874,7 @@
             </div>
           `;
                 card.querySelector('[data-action="delete"]').addEventListener("click", () =>
-                    deleteGalleryItem(item.id)
+                    deleteGalleryItem(item.id, card)
                 );
                 galleryGrid.appendChild(card);
             }
@@ -1663,6 +1924,7 @@
     });
 
     async function loadAccounts() {
+        showLoading(accountsList, "Loading admin accounts…");
         try {
             const accounts = await api("/api/accounts");
             accountsList.innerHTML = "";
@@ -1703,12 +1965,24 @@
                         confirmText: "Save"
                     });
                     if (!result) return;
+                    const newPerms = result.permissions || [];
+                    // Guard against an admin editing their own account into a state
+                    // where they lose access to the Permissions tab (self-lockout).
+                    if (acc.username === currentUser && !newPerms.includes("permissions")) {
+                        const proceed = await confirmDialog({
+                            title: "Remove your own Permissions access?",
+                            message: "You're currently signed in as this account. Saving without \"permissions\" checked will lock you out of this tab until another admin re-grants it. Continue anyway?",
+                            confirmText: "Remove anyway",
+                        });
+                        if (!proceed) return;
+                    }
                     try {
                         await api("/api/accounts/" + encodeURIComponent(acc.username) + "/permissions", {
                             method: "PUT",
-                            body: JSON.stringify({ permissions: result.permissions || [] })
+                            body: JSON.stringify({ permissions: newPerms })
                         });
                         showToast("Permissions updated");
+                        acc.permissions = newPerms;
                         await loadAccounts();
                     } catch (err) {
                         showToast(err.message);
@@ -1740,11 +2014,19 @@
                 // delete
                 card.querySelector('[data-action="delete"]').addEventListener("click", async () => {
                     if (acc.username === currentUser) { showToast("Cannot delete the currently signed-in account"); return; }
-                    if (!confirm("Delete admin " + acc.username + "?")) return;
+                    const ok = await confirmDialog({
+                        title: "Delete admin account?",
+                        message: `This will permanently remove <strong>${acc.username}</strong> and revoke their access.`,
+                        confirmText: "Delete admin",
+                    });
+                    if (!ok) return;
                     try {
                         await api("/api/accounts/" + encodeURIComponent(acc.username), { method: "DELETE" });
                         showToast("Admin deleted");
-                        await loadAccounts();
+                        card.remove();
+                        if (!accountsList.children.length) {
+                            accountsList.innerHTML = `<div class="news-meta">No admin accounts found.</div>`;
+                        }
                     } catch (err) {
                         showToast(err.message);
                     }
@@ -1768,6 +2050,10 @@
     const consoleSend = document.getElementById("console-send");
 
     async function loadServerInfo() {
+        infoMotd.textContent = "…";
+        infoOnline.textContent = "…";
+        infoPlayers.textContent = "…";
+        infoSlots.textContent = "…";
         try {
             const info = await api("/api/server-info");
             infoMotd.textContent = info.motd;
@@ -1786,6 +2072,36 @@
 
     document.getElementById("btn-refresh-server").addEventListener("click", loadServerInfo);
 
+    // Console history persistence
+    // Keeps the last CONSOLE_HISTORY_LIMIT lines of console output in
+    // localStorage (not tied to any admin's identity/token) so a reload or
+    // tab switch doesn't wipe out recent command history.
+    const CONSOLE_HISTORY_KEY = "smp-admin-console-history";
+    const CONSOLE_HISTORY_LIMIT = 200;
+
+    function loadConsoleHistory() {
+        try {
+            const saved = localStorage.getItem(CONSOLE_HISTORY_KEY);
+            if (saved) {
+                consoleOutput.textContent = saved;
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+        } catch {}
+    }
+
+    function appendConsoleHistory(text) {
+        consoleOutput.textContent += text;
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        try {
+            const lines = consoleOutput.textContent.split("\n");
+            const trimmed = lines.slice(-CONSOLE_HISTORY_LIMIT).join("\n");
+            consoleOutput.textContent = trimmed;
+            localStorage.setItem(CONSOLE_HISTORY_KEY, trimmed);
+        } catch {}
+    }
+
+    loadConsoleHistory();
+
     consoleSend.addEventListener("click", async () => {
         const cmd = consoleInput.value.trim();
         if (!cmd) return;
@@ -1794,8 +2110,7 @@
                 method: "POST",
                 body: JSON.stringify({ command: cmd }),
             });
-            consoleOutput.textContent += "> " + cmd + "\n" + res.response + "\n";
-            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            appendConsoleHistory("> " + cmd + "\n" + res.response + "\n");
             consoleInput.value = "";
         } catch (err) {
             showToast(err.message);
