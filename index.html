@@ -1606,8 +1606,12 @@
             title: "Add player",
             bodyHTML: `
           <div class="modal-field">
-            <label>Player name</label>
-            <input name="name" />
+            <label>Player username</label>
+            <input name="name" placeholder="Minecraft username or .GamerTag" />
+          </div>
+          <div class="modal-field">
+            <label>Player real name</label>
+            <input name="realName" placeholder="Optional: Their real name" />
           </div>
         `,
         });
@@ -1730,7 +1734,9 @@
                           <div class="player-name">${p.name}</div>
                           <div class="${statusPillClass}">${statusLabel}</div>
                         </div>
+                        ${p.realName ? `<div style="font-size:11px; color: var(--muted); margin-top:2px;">${p.realName}</div>` : `<div style="font-size:11px; color: var(--muted); margin-top:2px;">-</div>`}
                         <div class="player-actions" style="margin-top:6px;">
+                          <button class="btn" data-action="edit">Edit name</button>
                           <button class="btn" data-action="whitelist">Whitelist</button>
                           <button class="btn danger" data-action="ban">Ban</button>
                           <button class="btn" data-action="neutral">Neutral</button>
@@ -1739,16 +1745,46 @@
                       </div>
                     </div>
                   `;
-            card.querySelector('[data-action="whitelist"]').addEventListener("click", () =>
+            const editBtn = card.querySelector('[data-action="edit"]');
+            const whitelistBtn = card.querySelector('[data-action="whitelist"]');
+            const banBtn = card.querySelector('[data-action="ban"]');
+            const neutralBtn = card.querySelector('[data-action="neutral"]');
+            const removeBtn = card.querySelector('[data-action="remove"]');
+
+            editBtn.addEventListener("click", async () => {
+                const result = await openModal({
+                    title: `Edit player: ${p.name}`,
+                    bodyHTML: `
+                    <div class="modal-field">
+                      <label>Real name</label>
+                      <input name="realName" value="${(p.realName || "").replace(/"/g, "&quot;")}" placeholder="Optional: Their real name" />
+                    </div>
+                  `,
+                    confirmText: "Save"
+                });
+                if (!result) return;
+                try {
+                    await api("/api/players/" + encodeURIComponent(p.name), {
+                        method: "PUT",
+                        body: JSON.stringify({ realName: result.realName }),
+                    });
+                    showToast("Player updated");
+                    p.realName = result.realName;
+                    renderPlayersPage();
+                } catch (err) {
+                    showToast(err.message);
+                }
+            });
+            whitelistBtn.addEventListener("click", () =>
                 setPlayerStatus(p.name, "whitelisted")
             );
-            card.querySelector('[data-action="ban"]').addEventListener("click", () =>
+            banBtn.addEventListener("click", () =>
                 setPlayerStatus(p.name, "banned")
             );
-            card.querySelector('[data-action="neutral"]').addEventListener("click", () =>
+            neutralBtn.addEventListener("click", () =>
                 setPlayerStatus(p.name, "neutral")
             );
-            card.querySelector('[data-action="remove"]').addEventListener("click", () =>
+            removeBtn.addEventListener("click", () =>
                 deletePlayer(p.name)
             );
             playersGrid.appendChild(card);
