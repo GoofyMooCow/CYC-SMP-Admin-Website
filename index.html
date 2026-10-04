@@ -1132,9 +1132,8 @@
     // -----------------------------
     // Config
     // -----------------------------
-    const API_BASE = "https://june-vagueness-try.ngrok-free.dev"; // change to your server URL
-
-    console.log("API:", API_BASE + "/api/players");
+    const API_BASE = "https://june-vagueness-try.ngrok-free.dev";
+    //const API_BASE = "http://localhost:5000";
 
     let authToken = null;
     let currentUser = null;
@@ -1154,42 +1153,30 @@
     async function api(path, options = {}) {
         const headers = options.headers || {};
         headers["Content-Type"] = "application/json";
-        headers['ngrok-skip-browser-warning'] = 'true';
-
+        headers["ngrok-skip-browser-warning"] = "true";
         if (authToken) {
             headers["Authorization"] = "Bearer " + authToken;
         }
 
-        const url = API_BASE + path;
+        const res = await fetch(API_BASE + path, { ...options, headers });
+        const text = await res.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (e) { /* non-JSON body */ }
 
-        console.log("➡️ REQUEST");
-        console.log("URL:", url);
-        console.log("METHOD:", options.method || "GET");
-        console.log("HEADERS:", headers);
-        console.log("BODY:", options.body || null);
-
-        const res = await fetch(url, {
-            ...options,
-            headers,
-        });
-
-        console.log("⬅️ RESPONSE");
-        console.log("STATUS:", res.status);
-        console.log("RESPONSE HEADERS:", [...res.headers.entries()]);
-
-        const text = await res.clone().text();
-        console.log("RAW BODY:", text);
-
-        if (res.status === 401) {
+        if (res.status === 401 && authToken) {
             forceReLogin("Your session has expired. Please sign in again.");
             throw new Error("Session expired");
         }
-
         if (!res.ok) {
-            throw new Error("Request failed: " + res.status);
+            throw new Error((data && data.error) || "Request failed: " + res.status);
         }
+        return data;
+    }
 
-        return JSON.parse(text);
+    function escapeHtml(v) {
+        return String(v ?? "").replace(/[&<>"']/g, (c) => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[c]));
     }
 
     function forceReLogin(message) {
@@ -1272,7 +1259,6 @@
             const tabs = document.querySelectorAll(".nav-item");
             tabs.forEach((t) => {
                 const tabName = t.dataset.tab;
-                console.log(tabName);
                 if (!permissions.includes(tabName)) {
                     t.style.display = "none";
 
@@ -1331,7 +1317,7 @@
         },
         players: {
             title: "Player Management",
-            subtitle: "Whitelist, ban, and manage players on the SMP.",
+            subtitle: "Whitelist, ban, and manage players on the SMP (via Gatekeeper).",
         },
         gallery: {
             title: "Gallery",
@@ -1599,7 +1585,32 @@
     const playersPaginationEl = document.getElementById("players-pagination");
     const PLAYERS_PAGE_SIZE = 12;
     let allPlayers = [];
+    let playerStatuses = [
+        { id: "whitelisted", label: "Whitelisted" },
+        { id: "neutral", label: "Neutral" },
+        { id: "banned", label: "Banned" },
+    ]; // replaced by the real list from Gatekeeper on load
     let playersPage = 1;
+
+    function playerFieldsHTML(p = {}) {
+        return `
+          <div class="modal-field">
+            <label>Real name</label>
+            <input name="realName" value="${escapeHtml(p.realName)}" placeholder="Optional" />
+          </div>
+          <div class="modal-field">
+            <label>Email</label>
+            <input name="email" type="email" value="${escapeHtml(p.email)}" placeholder="Optional" />
+          </div>
+          <div class="modal-field">
+            <label>Phone</label>
+            <input name="phone" value="${escapeHtml(p.phone)}" placeholder="Optional" />
+          </div>
+          <div class="modal-field">
+            <label>Discord (shown publicly)</label>
+            <input name="discord" value="${escapeHtml(p.discord)}" placeholder="Optional" />
+          </div>`;
+    }
 
     document.getElementById("btn-add-player").addEventListener("click", async () => {
         const result = await openModal({
@@ -1609,10 +1620,7 @@
             <label>Player username</label>
             <input name="name" placeholder="Minecraft username or .GamerTag" />
           </div>
-          <div class="modal-field">
-            <label>Player real name</label>
-            <input name="realName" placeholder="Optional: Their real name" />
-          </div>
+          ${playerFieldsHTML()}
         `,
         });
         if (!result) return;
@@ -1621,56 +1629,29 @@
                 method: "POST",
                 body: JSON.stringify(result),
             });
-            showToast("Player added");
-            if (created && created.name) {
-                allPlayers.push(created);
-                renderPlayersPage();
-            } else {
-                await loadPlayers();
-            }
+            showToast(created.warning || "Player added");
+            await loadPlayers();
         } catch (err) {
             showToast(err.message);
         }
     });
 
-    async function setPlayerStatus(name, status) {
-        const player = allPlayers.find((p) => p.name === name);
-        const previousStatus = player ? player.status : undefined;
+    async function setPlayerStatus(player, status) {
+        const previousStatus = player.status;
         // Optimistic update: reflect the change immediately, roll back on failure.
-        if (player) {
-            player.status = status;
-            renderPlayersPage();
-        }
+        player.status = status;
+        renderPlayersPage();
         try {
-            await api("/api/players/" + encodeURIComponent(name) + "/status", {
+            const updated = await api("/api/players/" + encodeURIComponent(player.uuid) + "/status", {
                 method: "PUT",
                 body: JSON.stringify({ status }),
             });
-            showToast(`Set ${name} to ${status}`);
-        } catch (err) {
-            if (player) {
-                player.status = previousStatus;
-                renderPlayersPage();
-            }
-            showToast(err.message);
-        }
-    }
-
-    async function deletePlayer(name) {
-        const ok = await confirmDialog({
-            title: "Remove player?",
-            message: `This will remove <strong>${name}</strong> from player management.`,
-            confirmText: "Remove player",
-        });
-        if (!ok) return;
-        try {
-            await api("/api/players/" + encodeURIComponent(name), {
-                method: "DELETE",
-            });
-            showToast("Player removed");
-            allPlayers = allPlayers.filter((p) => p.name !== name);
+            Object.assign(player, updated);
             renderPlayersPage();
+            showToast(`Set ${player.name} to ${status}`);
         } catch (err) {
+            player.status = previousStatus;
+            renderPlayersPage();
             showToast(err.message);
         }
     }
@@ -1683,7 +1664,11 @@
     function getFilteredPlayers() {
         const q = playersSearchInput.value.trim().toLowerCase();
         if (!q) return allPlayers;
-        return allPlayers.filter((p) => p.name.toLowerCase().includes(q));
+        return allPlayers.filter((p) =>
+            (p.name || "").toLowerCase().includes(q) ||
+            (p.realName || "").toLowerCase().includes(q) ||
+            (p.discord || "").toLowerCase().includes(q)
+        );
     }
 
     function renderPlayersPage() {
@@ -1710,83 +1695,77 @@
             const card = document.createElement("div");
             card.className = "player-card";
             const statusPillClass =
-                p.status === "whitelisted"
-                    ? "pill success"
-                    : p.status === "banned"
-                        ? "pill danger"
-                        : "pill";
-            const statusLabel =
-                p.status === "whitelisted"
-                    ? "Whitelisted"
-                    : p.status === "banned"
-                        ? "Banned"
-                        : "Neutral";
+                p.status === "whitelisted" ? "pill success" : p.status === "banned" ? "pill danger" : "pill";
+            const statusInfo = playerStatuses.find((s) => s.id === p.status);
+            const statusLabel = statusInfo ? statusInfo.label : p.status;
 
             const avatarUrl = p.bedrock
-                ? `https://mc-api.io/render/face/${p.name.slice(1).replace(/_/g, "%20")}/bedrock`
-                : `https://mc-heads.net/avatar/${p.name}`;
+                ? `https://mc-api.io/render/face/${encodeURIComponent(p.name.slice(1).replace(/_/g, " "))}/bedrock`
+                : `https://mc-heads.net/avatar/${encodeURIComponent(p.name)}`;
+
+            const lastSeen = p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : "never";
+            const attempts = p.joinAttempts ? ` · ${p.joinAttempts} join attempt${p.joinAttempts === 1 ? "" : "s"}` : "";
 
             card.innerHTML = `
                     <div style="display:flex; gap:10px; align-items:flex-start;">
-                      <img src="${avatarUrl}" style="width:48px; height:48px; border-radius:4px;" alt="${p.name}'s avatar">
+                      <img src="${escapeHtml(avatarUrl)}" style="width:48px; height:48px; border-radius:4px;" alt="${escapeHtml(p.name)}'s avatar">
                       <div style="flex:1; display:flex; flex-direction:column;">
                         <div class="player-header">
-                          <div class="player-name">${p.name}</div>
-                          <div class="${statusPillClass}">${statusLabel}</div>
+                          <div class="player-name">${escapeHtml(p.name)}</div>
+                          <div class="${statusPillClass}">${escapeHtml(statusLabel)}</div>
                         </div>
-                        ${p.realName ? `<div style="font-size:11px; color: var(--muted); margin-top:2px;">${p.realName}</div>` : `<div style="font-size:11px; color: var(--muted); margin-top:2px;">-</div>`}
+                        <div style="font-size:11px; color: var(--muted); margin-top:2px;">${p.realName ? escapeHtml(p.realName) : "-"}</div>
+                        <div style="font-size:11px; color: var(--muted); margin-top:2px;">Last seen: ${escapeHtml(lastSeen)}${escapeHtml(attempts)}</div>
                         <div class="player-actions" style="margin-top:6px;">
-                          <button class="btn" data-action="edit">Edit name</button>
-                          <button class="btn" data-action="whitelist">Whitelist</button>
-                          <button class="btn danger" data-action="ban">Ban</button>
-                          <button class="btn" data-action="neutral">Neutral</button>
-                          <button class="btn" data-action="remove">Remove</button>
+                          <button class="btn" data-action="edit">Edit info</button>
+                          ${playerStatuses.map((s) => `
+                            <button class="btn ${s.id === "banned" ? "danger" : ""}" data-status="${escapeHtml(s.id)}" ${s.id === p.status ? "disabled" : ""}>${escapeHtml(s.label)}</button>
+                          `).join("")}
+                          <button class="btn danger" data-action="delete">Delete</button>
                         </div>
                       </div>
                     </div>
                   `;
-            const editBtn = card.querySelector('[data-action="edit"]');
-            const whitelistBtn = card.querySelector('[data-action="whitelist"]');
-            const banBtn = card.querySelector('[data-action="ban"]');
-            const neutralBtn = card.querySelector('[data-action="neutral"]');
-            const removeBtn = card.querySelector('[data-action="remove"]');
 
-            editBtn.addEventListener("click", async () => {
+            card.querySelector('[data-action="edit"]').addEventListener("click", async () => {
                 const result = await openModal({
                     title: `Edit player: ${p.name}`,
-                    bodyHTML: `
-                    <div class="modal-field">
-                      <label>Real name</label>
-                      <input name="realName" value="${(p.realName || "").replace(/"/g, "&quot;")}" placeholder="Optional: Their real name" />
-                    </div>
-                  `,
-                    confirmText: "Save"
+                    bodyHTML: playerFieldsHTML(p),
+                    confirmText: "Save",
                 });
                 if (!result) return;
                 try {
-                    await api("/api/players/" + encodeURIComponent(p.name), {
+                    const updated = await api("/api/players/" + encodeURIComponent(p.uuid), {
                         method: "PUT",
-                        body: JSON.stringify({ realName: result.realName }),
+                        body: JSON.stringify(result),
                     });
+                    Object.assign(p, updated);
                     showToast("Player updated");
-                    p.realName = result.realName;
                     renderPlayersPage();
                 } catch (err) {
                     showToast(err.message);
                 }
             });
-            whitelistBtn.addEventListener("click", () =>
-                setPlayerStatus(p.name, "whitelisted")
-            );
-            banBtn.addEventListener("click", () =>
-                setPlayerStatus(p.name, "banned")
-            );
-            neutralBtn.addEventListener("click", () =>
-                setPlayerStatus(p.name, "neutral")
-            );
-            removeBtn.addEventListener("click", () =>
-                deletePlayer(p.name)
-            );
+            // Delete player
+            card.querySelector('[data-action="delete"]').addEventListener("click", async () => {
+                const ok = await confirmDialog({
+                    title: "Delete player?",
+                    message: `This will permanently remove ${p.name} from Gatekeeper.`,
+                    confirmText: "Delete player",
+                });
+                if (!ok) return;
+                try {
+                    await api("/api/players/" + encodeURIComponent(p.uuid), { method: "DELETE" });
+                    showToast("Player deleted");
+                    allPlayers = allPlayers.filter((x) => x.uuid !== p.uuid);
+                    renderPlayersPage();
+                } catch (err) {
+                    showToast(err.message);
+                }
+            });
+            card.querySelectorAll("[data-status]").forEach((btn) => {
+                btn.addEventListener("click", () => setPlayerStatus(p, btn.dataset.status));
+            });
             playersGrid.appendChild(card);
         }
 
@@ -1805,10 +1784,15 @@
         showLoading(playersGrid, "Loading players…");
         playersPaginationEl.innerHTML = "";
         try {
-            allPlayers = await api("/api/players");
+            const [players, statuses] = await Promise.all([
+                api("/api/players"),
+                api("/api/statuses").catch(() => null),
+            ]);
+            if (statuses && statuses.length) playerStatuses = statuses;
+            allPlayers = players;
             renderPlayersPage();
         } catch (err) {
-            playersGrid.innerHTML = `<div class="news-meta">Failed to load players: ${err.message}</div>`;
+            playersGrid.innerHTML = `<div class="news-meta">Failed to load players: ${escapeHtml(err.message)}</div>`;
         }
     }
 
