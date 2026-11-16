@@ -1599,6 +1599,10 @@
             <input name="realName" value="${escapeHtml(p.realName)}" placeholder="Optional" />
           </div>
           <div class="modal-field">
+            <label>Last name</label>
+            <input name="lastName" value="${escapeHtml(p.lastName)}" placeholder="Optional" />
+          </div>
+          <div class="modal-field">
             <label>Email</label>
             <input name="email" type="email" value="${escapeHtml(p.email)}" placeholder="Optional" />
           </div>
@@ -1667,6 +1671,7 @@
         return allPlayers.filter((p) =>
             (p.name || "").toLowerCase().includes(q) ||
             (p.realName || "").toLowerCase().includes(q) ||
+            (p.lastName || "").toLowerCase().includes(q) ||
             (p.discord || "").toLowerCase().includes(q)
         );
     }
@@ -1705,6 +1710,7 @@
 
             const lastSeen = p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : "never";
             const attempts = p.joinAttempts ? ` · ${p.joinAttempts} join attempt${p.joinAttempts === 1 ? "" : "s"}` : "";
+            const fullName = [p.realName, p.lastName].filter(Boolean).join(" ") || "-";
 
             card.innerHTML = `
                     <div style="display:flex; gap:10px; align-items:flex-start;">
@@ -1714,7 +1720,7 @@
                           <div class="player-name">${escapeHtml(p.name)}</div>
                           <div class="${statusPillClass}">${escapeHtml(statusLabel)}</div>
                         </div>
-                        <div style="font-size:11px; color: var(--muted); margin-top:2px;">${p.realName ? escapeHtml(p.realName) : "-"}</div>
+                        <div style="font-size:11px; color: var(--muted); margin-top:2px;">${escapeHtml(fullName)}</div>
                         <div style="font-size:11px; color: var(--muted); margin-top:2px;">Last seen: ${escapeHtml(lastSeen)}${escapeHtml(attempts)}</div>
                         <div class="player-actions" style="margin-top:6px;">
                           <button class="btn" data-action="edit">Edit info</button>
