@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>SMP Admin Panel</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <link rel="icon" href="./favicon.png">
   <style>
       :root {
@@ -593,6 +593,135 @@
           margin-top: 4px;
       }
 
+      .stats-layout {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 10px;
+      }
+
+      .stats-card {
+          border-radius: var(--radius-md);
+          padding: 10px 10px 12px;
+          background: var(--panel-alt);
+          border: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+      }
+
+      .stats-card-title {
+          font-size: 12px;
+          font-weight: 700;
+      }
+
+      .stat-kpis {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+          gap: 8px;
+      }
+
+      .kpi {
+          background: #17181d;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: 8px 9px;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+      }
+
+      .kpi-label {
+          color: var(--muted);
+          font-size: 10px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          font-family: var(--mono);
+      }
+
+      .kpi-value {
+          font-size: 18px;
+          font-weight: 700;
+      }
+
+      .chart-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-top: 4px;
+      }
+
+      .chart-row {
+          display: grid;
+          grid-template-columns: 72px 1fr 42px;
+          gap: 8px;
+          align-items: center;
+          font-size: 11px;
+          color: var(--muted);
+      }
+
+      .bar-track {
+          height: 10px;
+          background: #101319;
+          border: 1px solid var(--border);
+          border-radius: 999px;
+          overflow: hidden;
+      }
+
+      .bar-fill {
+          height: 100%;
+          background: linear-gradient(90deg, var(--accent), #9bbd63);
+          border-radius: inherit;
+      }
+
+      .age-chart {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 4px;
+          height: 170px;
+          padding: 8px 4px 0;
+          border-bottom: 1px solid var(--border);
+          overflow-x: auto;
+          width: 100%;
+      }
+
+      .age-bar-group {
+          flex: 1;
+          min-width: 18px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 6px;
+          height: 100%;
+      }
+
+      .age-bar {
+          width: 100%;
+          max-width: 18px;
+          min-height: 4px;
+          background: linear-gradient(180deg, #9bbd63, var(--accent));
+          border-radius: 4px 4px 0 0;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+      }
+
+      .age-bar-label {
+          font-size: 9px;
+          color: var(--muted);
+          font-family: var(--mono);
+      }
+
+      .age-bar-value {
+          font-size: 9px;
+          color: var(--text);
+          font-family: var(--mono);
+      }
+
+      .empty-state {
+          font-size: 12px;
+          color: var(--muted);
+      }
+
       /* Gallery */
       .gallery-grid {
           display: grid;
@@ -876,31 +1005,133 @@
       }
 
       @media (max-width: 900px) {
+          :root { --topbar-h: calc(52px + env(safe-area-inset-top, 0px)); }
+          html { -webkit-text-size-adjust: 100%; }
+
+          body { display: block; padding: 0; min-height: 100vh; min-height: 100dvh; }
+
           #app {
-              grid-template-columns: 1fr;
-              grid-template-rows: auto 1fr;
+              display: block;
+              max-width: none;
               height: auto;
               max-height: none;
+              min-height: 100dvh;
+              border: 0;
+              border-radius: 0;
+              box-shadow: none;
+              overflow: visible; /* needed so the sticky bars work */
           }
+
+          /* Sidebar becomes a slim sticky top bar: logo + user/logout */
           .sidebar {
+              position: sticky;
+              top: 0;
+              z-index: 15;
+              height: var(--topbar-h);
               flex-direction: row;
               align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              padding: env(safe-area-inset-top, 0px) 12px 0;
+              border-right: 0;
+              border-bottom: 1px solid var(--border);
+          }
+          .sidebar-nav { display: none; }
+          .brand { padding-bottom: 0; border-bottom: 0; }
+          .sidebar-footer { display: flex; margin-top: 0; }
+          .user-pill { gap: 12px; padding: 6px 10px; }
+          .user-pill span { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .logout-btn { padding: 6px 4px; font-size: 12px; }
+
+          .main { padding: 14px 14px 28px; gap: 12px; }
+          .main-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+          .main-title { font-size: 16px; }
+
+          /* Tab strip: sticky, swipeable, full-bleed */
+          .content { display: block; flex: none; }
+          .tab-strip {
+              position: sticky;
+              top: var(--topbar-h);
+              z-index: 10;
+              background: var(--panel);
+              margin: 0 -14px;
+              padding: 0 14px;
               overflow-x: auto;
+              white-space: nowrap;
+              scrollbar-width: none;
+              -webkit-overflow-scrolling: touch;
           }
-          .sidebar-footer {
-              display: none;
-          }
+          .tab-strip::-webkit-scrollbar { display: none; }
+          .tab { flex: 0 0 auto; padding: 12px 14px; font-size: 13.5px; }
+          .tab-content { margin-top: 12px; overflow: visible; }
+          .tab-inner-scroll { overflow: visible; padding-right: 0; }
+
+          /* Grids: single column, never wider than the screen */
+          .players-grid,
+          .gallery-grid,
+          .stats-layout,
+          .server-layout { grid-template-columns: minmax(0, 1fr); }
+          .stats-card { min-width: 0; }
+          .age-chart { height: 150px; }
+          .age-bar-group { min-width: 22px; }
+
+          .console-box { height: min(60dvh, 420px); }
+          .info-box { height: auto; }
       }
 
       @media (max-width: 640px) {
-          body {
-              padding: 12px;
+          /* Login */
+          #login-overlay { padding: 16px; overflow-y: auto; }
+          .login-card { padding: 22px 18px 18px; }
+          .login-footer { justify-content: stretch; }
+          .login-button { width: 100%; justify-content: center; padding: 12px 16px; }
+
+          /* Touch targets + no iOS zoom-on-focus (inputs must be >= 16px) */
+          .btn { min-height: 38px; padding: 8px 12px; font-size: 13px; }
+          .input-shell input,
+          .search-input,
+          .modal-field input,
+          .modal-field textarea,
+          .console-input-row input { font-size: 16px; }
+          .search-input { max-width: none; padding: 10px 12px; }
+          .console-input-row input { padding: 10px 12px; }
+          .modal-field input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; }
+
+          .section-header { flex-wrap: wrap; }
+
+          /* Cards */
+          .news-header-row { align-items: flex-start; }
+          .news-header-row > div:first-child { min-width: 0; }
+          .news-title, .news-body, .player-name { overflow-wrap: anywhere; }
+          .pill { flex-shrink: 0; }
+          .news-actions { gap: 8px; }
+          .news-actions .btn { flex: 1; }
+          .player-actions .btn { flex: 1 1 auto; }
+
+          /* Modals become bottom sheets */
+          .modal-backdrop { align-items: flex-end; }
+          .modal,
+          .modal.confirm-modal {
+              max-width: none;
+              max-height: 92dvh;
+              overflow-y: auto;
+              border-radius: 12px 12px 0 0;
+              padding: 18px 16px 0;
           }
-          .login-card {
-              padding: 22px 18px 18px;
+          .modal-actions {
+              position: sticky;
+              bottom: 0;
+              background: var(--panel);
+              margin-top: 0;
+              padding: 10px 0 calc(14px + env(safe-area-inset-bottom, 0px));
           }
-          .server-layout {
-              grid-template-columns: 1fr;
+          .modal-actions .btn { flex: 1; }
+
+          .toast {
+              left: 12px;
+              right: 12px;
+              bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+              text-align: center;
           }
       }
   </style>
@@ -953,7 +1184,7 @@
       </div>
     </div>
 
-    <div>
+    <div class="sidebar-nav">
       <div class="sidebar-section-label">Navigation</div>
       <div class="nav-list">
         <div class="nav-item active" data-tab="news">
@@ -961,6 +1192,9 @@
         </div>
         <div class="nav-item" data-tab="players">
           <span>Player Management</span>
+        </div>
+        <div class="nav-item" data-tab="statistics">
+          <span>Statistics</span>
         </div>
         <div class="nav-item" data-tab="gallery">
           <span>Gallery</span>
@@ -999,6 +1233,7 @@
       <div class="tab-strip">
         <div class="tab active" id="news-tab" data-tab="news">News</div>
         <div class="tab" id="players-tab" data-tab="players">Players</div>
+        <div class="tab" id="statistics-tab" data-tab="statistics">Statistics</div>
         <div class="tab" id="gallery-tab" data-tab="gallery">Gallery</div>
         <div class="tab" id="server-tab" data-tab="server">Server</div>
         <!-- Permissions tab button -->
@@ -1037,6 +1272,33 @@
             </div>
             <div class="players-grid" id="players-grid"></div>
             <div class="pagination" id="players-pagination"></div>
+          </div>
+        </div>
+
+        <!-- Statistics tab -->
+        <div class="tab-panel" id="tab-statistics" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">Statistics</div>
+          </div>
+          <div class="tab-inner-scroll">
+            <div class="stats-layout">
+              <div class="stats-card">
+                <div class="stats-card-title">Overview</div>
+                <div class="stat-kpis" id="stats-overview"></div>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-title">Status split</div>
+                <div class="chart-stack" id="stats-status-chart"></div>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-title">Platform split</div>
+                <div class="chart-stack" id="stats-platform-chart"></div>
+              </div>
+              <div class="stats-card" style="grid-column: 1 / -1;">
+                <div class="stats-card-title">Age distribution</div>
+                <div class="chart-stack" id="stats-age-chart"></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1179,6 +1441,21 @@
         }[c]));
     }
 
+    function getAgeFromBirthday(dateStr) {
+        if (!dateStr) return null;
+        const match = /^\d{4}-\d{2}-\d{2}$/.exec(dateStr);
+        if (!match) return null;
+
+        const [year, month, day] = dateStr.split("-").map(Number);
+        const today = new Date();
+        let age = today.getFullYear() - year;
+        const hasHadBirthdayThisYear =
+            today.getMonth() + 1 > month ||
+            (today.getMonth() + 1 === month && today.getDate() >= day);
+        if (!hasHadBirthdayThisYear) age -= 1;
+        return Math.max(age, 0);
+    }
+
     function forceReLogin(message) {
         authToken = null;
         currentUser = null;
@@ -1252,14 +1529,15 @@
 
             sidebarUsername.textContent = currentUser;
             loginOverlay.style.display = "none";
-            appRoot.style.display = "grid";
+            appRoot.style.display = "";
             showToast("Signed in as " + currentUser);
 
             // Remove all tabs that are not in permissions
             const tabs = document.querySelectorAll(".nav-item");
             tabs.forEach((t) => {
                 const tabName = t.dataset.tab;
-                if (!permissions.includes(tabName)) {
+                const isAllowed = tabName === "statistics" ? permissions.includes("players") : permissions.includes(tabName);
+                if (!isAllowed) {
                     t.style.display = "none";
 
                     const panel = document.getElementById("tab-" + tabName);
@@ -1302,6 +1580,7 @@
     const panels = {
         news: document.getElementById("tab-news"),
         players: document.getElementById("tab-players"),
+        statistics: document.getElementById("tab-statistics"),
         gallery: document.getElementById("tab-gallery"),
         server: document.getElementById("tab-server"),
         // add permissions panel
@@ -1318,6 +1597,10 @@
         players: {
             title: "Player Management",
             subtitle: "Whitelist, ban, and manage players on the SMP (via Gatekeeper).",
+        },
+        statistics: {
+            title: "Player Statistics",
+            subtitle: "Track age, status, and platform trends across the SMP.",
         },
         gallery: {
             title: "Gallery",
@@ -1603,6 +1886,10 @@
             <input name="lastName" value="${escapeHtml(p.lastName)}" placeholder="Optional" />
           </div>
           <div class="modal-field">
+            <label>Birthday (private)</label>
+            <input name="birthday" type="date" value="${escapeHtml(p.birthday || "")}" />
+          </div>
+          <div class="modal-field">
             <label>Email</label>
             <input name="email" type="email" value="${escapeHtml(p.email)}" placeholder="Optional" />
           </div>
@@ -1676,9 +1963,104 @@
         );
     }
 
+    function renderStatistics() {
+        const target = document.getElementById("stats-overview");
+        const ageTarget = document.getElementById("stats-age-chart");
+        const statusTarget = document.getElementById("stats-status-chart");
+        const platformTarget = document.getElementById("stats-platform-chart");
+
+        if (!target || !ageTarget || !statusTarget || !platformTarget) return;
+
+        const ages = allPlayers
+            .map((p) => getAgeFromBirthday(p.birthday))
+            .filter((age) => age !== null);
+        const statusCounts = {};
+        const platformCounts = { Java: 0, Bedrock: 0 };
+
+        for (const player of allPlayers) {
+            statusCounts[player.status] = (statusCounts[player.status] || 0) + 1;
+            if (player.bedrock) platformCounts.Bedrock += 1; else platformCounts.Java += 1;
+        }
+
+        const ageBuckets = {};
+        for (let i = 0; i <= 18; i++) ageBuckets[String(i)] = 0;
+        ageBuckets[">18"] = 0;
+
+        for (const age of ages) {
+            if (age < 9) ageBuckets["0"] += 1;
+            else if (age <= 18) ageBuckets[String(age)] += 1;
+            else ageBuckets[">18"] += 1;
+        }
+
+        const totalPlayers = allPlayers.length || 0;
+        const avgAge = ages.length ? Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length) : 0;
+        const knownBirthdays = ages.length;
+
+        const renderBars = (entries, maxValue) => {
+            const max = Math.max(maxValue, 1);
+            return entries.map(([label, count]) => `
+                <div class="chart-row">
+                    <span>${escapeHtml(label)}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width: ${(count / max) * 100}%"></div></div>
+                    <strong>${count}</strong>
+                </div>
+            `).join("");
+        };
+
+        const renderAgeBars = (entries, maxValue) => {
+            const max = Math.max(maxValue, 1);
+            return `
+                <div class="age-chart">
+                    ${entries.map(([label, count]) => `
+                        <div class="age-bar-group">
+                            <div class="age-bar-value">${count}</div>
+                            <div class="age-bar" style="height: ${(count / max) * 100}%"></div>
+                            <div class="age-bar-label">${escapeHtml(label)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+        };
+
+        target.innerHTML = `
+            <div class="kpi">
+                <div class="kpi-label">Players</div>
+                <div class="kpi-value">${totalPlayers}</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Avg age</div>
+                <div class="kpi-value">${ages.length ? avgAge : "—"}</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Birthdays</div>
+                <div class="kpi-value">${knownBirthdays}</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">States</div>
+                <div class="kpi-value">${Object.keys(statusCounts).length || 0}</div>
+            </div>
+        `;
+
+        const ageEntries = Object.entries(ageBuckets);
+        ageTarget.innerHTML = ageEntries.some(([, count]) => count > 0)
+            ? renderAgeBars(ageEntries, Math.max(...ageEntries.map(([, count]) => count)))
+            : '<div class="empty-state">No birthdays recorded yet.</div>';
+
+        const statusEntries = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
+        statusTarget.innerHTML = statusEntries.length
+            ? renderBars(statusEntries.map(([label, count]) => [label || "unknown", count]), Math.max(...statusEntries.map(([, count]) => count)))
+            : '<div class="empty-state">No status data available.</div>';
+
+        const platformEntries = Object.entries(platformCounts).filter(([, count]) => count > 0);
+        platformTarget.innerHTML = platformEntries.length
+            ? renderBars(platformEntries, Math.max(...platformEntries.map(([, count]) => count)))
+            : '<div class="empty-state">No platform data available.</div>';
+    }
+
     function renderPlayersPage() {
         const filtered = getFilteredPlayers();
         playersGrid.innerHTML = "";
+        renderStatistics();
 
         if (!allPlayers.length) {
             playersGrid.innerHTML = `<div class="news-meta">No players yet.</div>`;
@@ -1711,6 +2093,8 @@
             const lastSeen = p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : "never";
             const attempts = p.joinAttempts ? ` · ${p.joinAttempts} join attempt${p.joinAttempts === 1 ? "" : "s"}` : "";
             const fullName = [p.realName, p.lastName].filter(Boolean).join(" ") || "-";
+            const age = getAgeFromBirthday(p.birthday);
+            const ageText = age === null ? "Age: -" : `Age: ${age}`;
 
             card.innerHTML = `
                     <div style="display:flex; gap:10px; align-items:flex-start;">
@@ -1721,6 +2105,7 @@
                           <div class="${statusPillClass}">${escapeHtml(statusLabel)}</div>
                         </div>
                         <div style="font-size:11px; color: var(--muted); margin-top:2px;">${escapeHtml(fullName)}</div>
+                        <div style="font-size:11px; color: var(--muted); margin-top:2px;">${escapeHtml(ageText)}</div>
                         <div style="font-size:11px; color: var(--muted); margin-top:2px;">Last seen: ${escapeHtml(lastSeen)}${escapeHtml(attempts)}</div>
                         <div class="player-actions" style="margin-top:6px;">
                           <button class="btn" data-action="edit">Edit info</button>
@@ -1970,7 +2355,7 @@
                     </div>
                     <div class="pill">#${acc.username}</div>
                   </div>
-                  <div style="display:flex; gap:8px; margin-top:8px;">
+                  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
                     <button class="btn" data-action="edit">Edit perms</button>
                     <button class="btn" data-action="passwd">Change password</button>
                     <button class="btn danger" data-action="delete">Delete</button>
